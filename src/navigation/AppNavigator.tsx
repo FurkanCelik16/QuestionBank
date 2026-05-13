@@ -33,7 +33,7 @@ export const AppNavigator: React.FC = () => {
       <Stack.Navigator screenOptions={screenOptions}>
         {!apiKey ? (
           <Stack.Screen
-            name="Settings"
+            name="Setup"
             component={SettingsScreen}
             options={{
               headerTitle: 'Kurulum (API Anahtarı)',

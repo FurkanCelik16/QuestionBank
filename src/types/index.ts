@@ -75,5 +75,6 @@ export type RootStackParamList = {
     pastResult?: TestHistoryItem;
   } | undefined;
   Settings: undefined;
+  Setup: undefined;
   History: undefined;
 };
