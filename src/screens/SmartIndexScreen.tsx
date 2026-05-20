@@ -42,22 +42,22 @@ const HISTORICAL_FIGURES: IndexItem[] = [
 ];
 
 const GEOGRAPHICAL_RESOURCES: IndexItem[] = [
-  { id: '1', name: 'Bor', emoji: '💎', sub: 'Türkiye\'nin En Zengin Rezervli Madeni' },
-  { id: '2', name: 'Bakır', emoji: '⚡', sub: 'Kastamonu Küre, Artvin Murgul Çıkarım ve İşletim' },
-  { id: '3', name: 'Linyit', emoji: '🔥', sub: 'En Yaygın Termik Enerji Kaynağımız' },
-  { id: '4', name: 'Krom', emoji: '🛡️', sub: 'Paslanmaz Çelik ve Fethiye Muğla Rezervi' },
-  { id: '5', name: 'Demir', emoji: '🏗️', sub: 'Sivas Divriği Çıkarım, Karabük Ereğli Fabrikaları' },
-  { id: '6', name: 'Doğalgaz', emoji: '☁️', sub: 'Hamitabat ve Akçakoca Çıkarımları' },
-  { id: '7', name: 'Taş Kömürü', emoji: '🪨', sub: 'Zonguldak Çıkarımı ve Çatalağzı Santrali' },
-  { id: '8', name: 'Jeotermal Enerji', emoji: '♨️', sub: 'Denizli Sarayköy ve Fay Hatları Kaynakları' },
-  { id: '9', name: 'Boksit', emoji: '🏗️', sub: 'Konya Seydişehir Alüminyum Tesisleri' },
-  { id: '10', name: 'Mermer', emoji: '🪨', sub: 'Türkiye\'nin En Çok İhraç Ettiği Maden Grubu' },
-  { id: '11', name: 'Asbest', emoji: '🔥', sub: 'Isıya Dayanıklı Lifli Maden Rezervleri' },
-  { id: '12', name: 'Manganez', emoji: '🛡️', sub: 'Demir-Çelik Sanayi Sertleştirici Katkısı' },
-  { id: '13', name: 'Barit', emoji: '🛢️', sub: 'Petrol Arama Sondaj Kuyuları Katkısı' },
-  { id: '14', name: 'Petrol', emoji: '🛢️', sub: 'Batman Raman Dağı Çıkarım ve Rafineriler' },
-  { id: '15', name: 'Rüzgar Enerjisi', emoji: '💨', sub: 'İzmir, Balıkesir ve Ege Kıyıları Potansiyeli' },
-  { id: '16', name: 'Güneş Enerjisi', emoji: '☀️', sub: 'Güneydoğu Anadolu ve Akdeniz Bölgeleri Gücü' },
+  { id: '1', name: 'Metalik Madenler', emoji: '⛏️', sub: 'Demir, Bakır, Krom, Boksit, Manganez Dağılışı' },
+  { id: '2', name: 'Enerji Kaynakları (Fosil)', emoji: '🔥', sub: 'Taş Kömürü, Linyit, Petrol, Doğalgaz Rezervleri' },
+  { id: '3', name: 'Yenilenebilir Enerji Kaynakları', emoji: '☀️', sub: 'Rüzgar, Güneş, Jeotermal ve Hidroelektrik Gücü' },
+  { id: '4', name: 'Sanayi Hammaddeleri & Bor', emoji: '💎', sub: 'Bor Mineralleri, Mermer, Tuz, Barit, Asbest Yatakları' },
+  { id: '5', name: 'Türkiye\'nin Dağları ve Oluşumları', emoji: '🏔️', sub: 'Kıvrımlı, Kırıklı ve Volkanik Dağ Silsileleri' },
+  { id: '6', name: 'Akarsularımız ve Havzaları', emoji: '🌊', sub: 'Açık ve Kapalı Havzalar, Rejimler ve Döküldükleri Denizler' },
+  { id: '7', name: 'Delta Ovaları ve Karstik Ovalar', emoji: '🌾', sub: 'Çukurova, Bafra, Çarşamba ve Tefenni, Acıpayam Karstik Ovaları' },
+  { id: '8', name: 'Türkiye\'nin Gölleri ve Oluşumu', emoji: '💧', sub: 'Tektonik, Karstik, Volkanik ve Set Göllerinin Analizi' },
+  { id: '9', name: 'Türkiye\'nin İklim Tipleri', emoji: '☀️', sub: 'Akdeniz, Karadeniz, Step ve Sert Karasal İklim Özellikleri' },
+  { id: '10', name: 'Toprak Tipleri ve Dağılışları', emoji: '🌱', sub: 'Zonal (Kahverengi Orman, Terra Rossa) ve Azonal Topraklar' },
+  { id: '11', name: 'Bitki Örtüsü Kuşakları', emoji: '🌳', sub: 'Maki, Bozkır, Orman Ve Türkiye\'deki Endemik Türler' },
+  { id: '12', name: 'Nüfus Dağılışı ve Yoğunluğu', emoji: '👥', sub: 'Sık ve Seyrek Nüfuslu Yöreler, Göç Hareketleri' },
+  { id: '13', name: 'Tarım Ürünleri ve Sınıflandırılması', emoji: '🌽', sub: 'Devlet Kontrolündeki Tarım Ürünleri ve Coğrafi Dağılışı' },
+  { id: '14', name: 'Hayvancılık Türleri ve Bölgeleri', emoji: '🐐', sub: 'Büyükbaş, Küçükbaş, Mera/Ahır, İpekböcekçiliği ve Arıcılık' },
+  { id: '15', name: 'Ulaşım Geçitleri ve Tüneller', emoji: '🚗', sub: 'Zigana, Kop, Sertavul, Gülek ve Yeni Ovit, Sabuncubeli Tünelleri' },
+  { id: '16', name: 'Turizm Bölgeleri ve UNESCO Mirasları', emoji: '🏛️', sub: 'Kültür, Termal, Yayla Turizmi ve Miras Alanları' },
 ];
 
 export const SmartIndexScreen: React.FC = () => {
@@ -143,7 +143,7 @@ export const SmartIndexScreen: React.FC = () => {
 
       <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.listContent}>
         <Text style={s.title}>
-          {activeTab === 'tarih' ? '👑 KPSS Akıllı Padişah & Sadrazam İndeksi' : '⛏️ KPSS Akıllı Maden & Kaynak İndeksi'}
+          {activeTab === 'tarih' ? '👑 KPSS Akıllı Padişah & Sadrazam İndeksi' : '🌍 KPSS Akıllı Coğrafya Konu İndeksi'}
         </Text>
         <Text style={s.subtitle}>
           Aşağıdaki kritik kavramlardan birini seçtiğinizde yapay zeka yüklediğiniz PDF notlarını derinlemesine tarayarak size özel nokta atışı ders notu hazırlar.
