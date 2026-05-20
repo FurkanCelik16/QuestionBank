@@ -1,14 +1,14 @@
 // ========================================
 // KPSS Timeline & Chronology Game (Zaman Tüneli) Screen
 // Includes interactive Timeline Explorer and a Chronological Sorting Game (Idea 6).
-// Features highly expanded 15-event databases for each era (total 45 events)
-// covering all requested wars and treaties (1. Kosova, 2. Kosova, Niğbolu, Varna, etc.).
+// Features 6 distinct historical eras (Kuruluş, Yükseliş, Duraklama, Gerileme, Dağılma, Cumhuriyet).
+// Cards are interactive: tapping them opens an academic KPSS Cheat Sheet detailing the event and ÖSYM tips.
 // ========================================
 
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Alert
+  StyleSheet, Modal, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
@@ -19,6 +19,7 @@ interface TimelineEvent {
   title: string;
   desc: string;
   emoji: string;
+  kpssTip: string; // The academic cheat sheet / trap alert for KPSS
 }
 
 interface Era {
@@ -30,65 +31,89 @@ interface Era {
 const HISTORICAL_ERAS: Era[] = [
   {
     id: 'kurulus',
-    title: '👑 Osmanlı Kuruluş ve Yükselme Dönemi',
+    title: '👑 Osmanlı Kuruluş Dönemi (1299 - 1453)',
     events: [
-      { id: 'k1', year: 1302, title: 'Koyunhisar Savaşı', desc: 'Bizans İmparatorluğu ile yapılan ilk savaş ve zafer.', emoji: '⚔️' },
-      { id: 'k2', year: 1326, title: 'Bursa’nın Fethi', desc: 'Bursa fethedilerek Osmanlı Devleti’nin yeni başkenti yapıldı, ilk gümüş para basıldı.', emoji: '🏰' },
-      { id: 'k3', year: 1364, title: 'Sırpsındığı Savaşı', desc: 'İlk Osmanlı-Haçlı savaşı ve Haçlıların bozguna uğratılması.', emoji: '⚔️' },
-      { id: 'k4', year: 1389, title: 'I. Kosova Savaşı', desc: 'Haçlılara karşı kazanılan büyük zafer; Osmanlı ilk kez top kullandı. I. Murat savaş alanında şehit düştü.', emoji: '🛡️' },
-      { id: 'k5', year: 1396, title: 'Niğbolu Savaşı', desc: 'Yıldırım Bayezid\'in büyük Haçlı ordusunu ezdiği ve Halife\'den "Sultan-ı İklim-i Rum" unvanı aldığı savaş.', emoji: '🎖️' },
-      { id: 'k6', year: 1402, title: 'Ankara Savaşı', desc: 'Yıldırım Bayezid ile Timur arasında yapıldı, Osmanlı yenildi ve Fetret Devri başladı.', emoji: '📉' },
-      { id: 'k7', year: 1444, title: 'Edirne-Segedin Antlaşması', desc: 'Osmanlı ile Macarlar arasında imzalanan ilk yazılı barış antlaşması.', emoji: '📜' },
-      { id: 'k8', year: 1444, title: 'Varna Savaşı', desc: 'Genç yaşta tahtı babasına bırakan II. Mehmet\'in çağrısıyla tekrar tahta çıkan II. Murat\'ın Haçlıları bozguna uğrattığı savaş.', emoji: '⚔️' },
-      { id: 'k9', year: 1448, title: 'II. Kosova Savaşı', desc: 'II. Murat komutasında Haçlıların kesin olarak yenilgiye uğratılmasıyla Türklerin Balkanlar\'dan atılamayacağı kanıtlandı.', emoji: '🛡️' },
-      { id: 'k10', year: 1453, title: 'İstanbul’un Fethi', desc: 'Fatih Sultan Mehmet komutasında İstanbul fethedildi, Doğu Roma yıkıldı, Orta Çağ kapandı.', emoji: '🏰' },
-      { id: 'k11', year: 1473, title: 'Otlukbeli Savaşı', desc: 'Fatih Sultan Mehmet’in Akkoyunlu Uzun Hasan\'ı yenerek Doğu Anadolu sınır güvenliğini sağladığı zafer.', emoji: '⚔️' },
-      { id: 'k12', year: 1514, title: 'Çaldıran Savaşı', desc: 'Yavuz Sultan Selim’in Safevilere karşı kazandığı tarihi doğu zaferi.', emoji: '🛡️' },
-      { id: 'k13', year: 1515, title: 'Turnadağ Savaşı', desc: 'Dulkadiroğullarının yıkılmasıyla Anadolu Türk siyasi birliğinin kesin olarak sağlandığı savaş.', emoji: '🤝' },
-      { id: 'k14', year: 1526, title: 'Mohaç Meydan Muharebesi', desc: 'Kanuni Sultan Süleyman önderliğindeki ordunun Macar ordusunu 2 saatte yenerek dünya tarihinin en kısa meydan zaferini kazandığı savaş.', emoji: '⚔️' },
-      { id: 'k15', year: 1538, title: 'Preveze Deniz Zaferi', desc: 'Barbaros Hayreddin Paşa komutasında Haçlı donanmasının yenilmesiyle Akdeniz\'in Türk gölü haline gelmesi.', emoji: '⛵' },
+      { id: 'k1', year: 1302, title: 'Koyunhisar Savaşı', desc: 'Bizans İmparatorluğu ile yapılan ilk savaş ve zaferdir.', emoji: '⚔️', kpssTip: 'Bizans ile yapılan İLK savaştır. Osman Bey dönemindedir. Osmanlı\'nın bağımsızlık yolundaki ilk büyük askeri tescilidir.' },
+      { id: 'k2', year: 1326, title: 'Bursa’nın Fethi', desc: 'Bursa fethedilerek Osmanlı Devleti’nin yeni başkenti yapıldı.', emoji: '🏰', kpssTip: 'Orhan Bey dönemindedir. Kuşatma uzun sürdüğü için askeri teşkilatlanmanın önemi anlaşılmış ve ilk gümüş para (akçe) basılmıştır.' },
+      { id: 'k3', year: 1329, title: 'Maltepe (Palekanon) Savaşı', desc: 'Bizans\'ın Anadolu topraklarını kurtarmak için yaptığı son büyük hamle kırıldı.', emoji: '⚔️', kpssTip: 'Orhan Bey dönemindedir. Bizans\'ın Anadolu\'daki direnci tamamen çökmüş, İznik ve İzmit\'in fethine yol açılmıştır.' },
+      { id: 'k4', year: 1364, title: 'Sırpsındığı Savaşı', desc: 'İlk Osmanlı-Haçlı savaşı ve Haçlıların bozguna uğratılması.', emoji: '⚔️', kpssTip: 'Haçlılarla yapılan İLK savaştır. I. Murat dönemindedir. Savaşın kazanılmasıyla Edirne başkent yapılmış ve Balkan fetihleri hız kazanmıştır.' },
+      { id: 'k5', year: 1389, title: 'I. Kosova Savaşı', desc: 'Haçlılara karşı kazanılan büyük zafer; Osmanlı ilk kez top kullandı.', emoji: '🛡️', kpssTip: 'I. Murat dönemindedir. İlk kez top (sesinden korkutmak amacıyla) kullanılmıştır. I. Murat savaş alanını gezerken bir Sırplı tarafından şehit edilmiştir (Savaş alanında şehit düşen İLK ve TEK padişahtır).' },
+      { id: 'k6', year: 1396, title: 'Niğbolu Savaşı', desc: 'Yıldırım Bayezid\'in büyük Haçlı ordusunu imha ettiği tarihi zafer.', emoji: '🎖️', kpssTip: 'Yıldırım Bayezid\'e bu zafer üzerine Abbasi Halifesi tarafından "Sultan-ı İklim-i Rum" (Anadolu Diyarının Sultanı) unvanı verilmiştir. Bu unvan Osmanlı\'nın İslam dünyasındaki prestijini zirveye taşımıştır.' },
+      { id: 'k7', year: 1402, title: 'Ankara Savaşı', desc: 'Yıldırım Bayezid ile Timur arasında yapıldı, Osmanlı yenildi ve Fetret Devri başladı.', emoji: '📉', kpssTip: 'Yıldırım Bayezid esir düşmüştür. Anadolu Türk siyasi birliği bozulmuş, beylikler yeniden kurulmuş ve Osmanlı 11 yıl sürecek "Fetret Devri" krizine girmiştir.' },
+      { id: 'k8', year: 1444, title: 'Edirne-Segedin Antlaşması', desc: 'Osmanlı ile Macarlar arasında imzalanan ilk yazılı barış antlaşması.', emoji: '📜', kpssTip: 'Osmanlı\'nın batıda imzaladığı İLK sınırlayıcı antlaşmadır. II. Murat bu antlaşmaya güvenerek tahtı 12 yaşındaki oğlu II. Mehmet\'e (Fatih) bırakmıştır.' },
+      { id: 'k9', year: 1444, title: 'Varna Savaşı', desc: 'Tahtı babasına bırakan II. Mehmet\'in çağrısıyla Haçlı ordusunu yok eden II. Murat zaferi.', emoji: '⚔️', kpssTip: 'Haçlıların Edirne-Segedin antlaşmasını bozması üzerine yapılmıştır. II. Murat ordunun başına geçerek Haçlıları imha etmiştir.' },
+      { id: 'k10', year: 1448, title: 'II. Kosova Savaşı', desc: 'II. Murat komutasında Haçlıların kesin olarak yenilgiye uğratılması.', emoji: '🛡️', kpssTip: 'Bu zaferle Balkanlar\'ın KESİN olarak Türk yurdu olduğu tescillenmiş ve Haçlılar savunmaya, Osmanlı ise taarruza geçmiştir (Miryokefalon savaşına benzer).' },
+    ]
+  },
+  {
+    id: 'yukselis',
+    title: '🚀 Osmanlı Yükselme Dönemi (1453 - 1579)',
+    events: [
+      { id: 'y1', year: 1453, title: 'İstanbul’un Fethi', desc: 'İstanbul fethedildi, Doğu Roma yıkıldı, Orta Çağ kapandı.', emoji: '🏰', kpssTip: 'Fatih Sultan Mehmet dönemidir. Kuruluş devri bitmiş, Yükselme devri başlamıştır. İpek yolu denetimi tamamen Osmanlı\'ya geçmiş, bu durum Avrupalıların Coğrafi Keşifleri başlatmasına neden olmuştur.' },
+      { id: 'y2', year: 1473, title: 'Otlukbeli Savaşı', desc: 'Akkoyunlu devleti yenilerek Doğu Anadolu sınır güvenliği sağlandı.', emoji: '⚔️', kpssTip: 'Fatih dönemindedir. Doğu Anadolu sınırlarımız güvence altına alınmış ve Akkoyunlu Devleti yıkılma sürecine girmiştir.' },
+      { id: 'y3', year: 1514, title: 'Çaldıran Savaşı', desc: 'Yavuz Sultan Selim’in Safevilere karşı kazandığı tarihi zafer.', emoji: '🛡️', kpssTip: 'Safevi (Şii) tehlikesi uzun bir süre için engellenmiş, Tebriz-Halep ipek yolu hattı kontrol altına alınmıştır.' },
+      { id: 'y4', year: 1515, title: 'Turnadağ Savaşı', desc: 'Dulkadiroğulları beyliği yıkılarak Anadolu Türk birliği sağlandı.', emoji: '🤝', kpssTip: 'Yavuz Sultan Selim dönemidir. Anadolu Türk Siyasi Birliği (ATSB) KESİN olarak ve tamamen sağlanmıştır. (İlk adımı atan Karesioğulları, kesinleştiren Dulkadiroğulları\'dır).' },
+      { id: 'y5', year: 1517, title: 'Ridaniye Savaşı ve Mısır Fethi', desc: 'Memlük devleti yıkıldı, Mısır fethedildi ve halifelik Osmanlı\'ya geçti.', emoji: '🕌', kpssTip: 'Yavuz Sultan Selim dönemidir. Halifelik makamı, kutsal emanetler Osmanlı\'ya geçmiş, Baharat Yolu kontrol altına alınmış ve devlet teokratik (dini) niteliğini güçlendirmiştir.' },
+      { id: 'y6', year: 1526, title: 'Mohaç Meydan Muharebesi', desc: 'Macar ordusunun 2 saatte yenildiği dünya tarihinin en kısa meydan zaferi.', emoji: '⚔️', kpssTip: 'Kanuni Sultan Süleyman dönemindedir. Macaristan Osmanlı\'ya bağlanmış ve Orta Avrupa\'da Osmanlı üstünlüğü kesinleşmiştir.' },
+      { id: 'y7', year: 1538, title: 'Preveze Deniz Zaferi', desc: 'Haçlı donanmasının yenilmesiyle Akdeniz Türk gölü haline geldi.', emoji: '⛵', kpssTip: 'Barbaros Hayreddin Paşa komutasındaki zaferdir. Akdeniz tamamen bir "Türk Gölü" haline gelmiştir. Bu gün günümüzde "Türk Denizcilik Günü" olarak kutlanır.' },
+      { id: 'y8', year: 1555, title: 'Amasya Antlaşması', desc: 'İran (Safeviler) ile imzalanan tarihteki ilk resmi anlaşmadır.', emoji: '📜', kpssTip: 'Kanuni dönemindedir. Safevi devleti ile yapılan İLK resmi anlaşma özelliğini taşır, sınırlar resmiyet kazanmıştır.' },
     ]
   },
   {
     id: 'duraklama',
-    title: '📉 Osmanlı Duraklama ve Gerileme Dönemi',
+    title: '📉 Osmanlı Duraklama Dönemi (1579 - 1699)',
     events: [
-      { id: 'd1', year: 1590, title: 'Ferhat Paşa Antlaşması', desc: 'Osmanlı Devleti doğuda en geniş sınırlarına ulaştı.', emoji: '📜' },
-      { id: 'd2', year: 1606, title: 'Zitvatorok Antlaşması', desc: 'Avusturya kralı Osmanlı padişahına protokolde eşit sayıldı, siyasi üstünlük sona erdi.', emoji: '📜' },
-      { id: 'd3', year: 1621, title: 'Hotin Seferi', desc: 'Genç Osman\'ın Yeniçeri disiplinsizliğini görerek ocağı kaldırmaya karar verdiği, ancak canıyla ödediği sefer.', emoji: '🛡️' },
-      { id: 'd4', year: 1639, title: 'Kasr-ı Şirin Antlaşması', desc: 'Bağdat Fatihi IV. Murat dönemi; bugünkü Türkiye-İran sınırını büyük ölçüde belirleyen tarihi antlaşma.', emoji: '✍️' },
-      { id: 'd5', year: 1672, title: 'Bucaş Antlaşması', desc: 'Lehistan ile imzalandı, Podolya alındı ve batıda en geniş sınırlara ulaşıldı.', emoji: '📜' },
-      { id: 'd6', year: 1683, title: 'II. Viyana Kuşatması', desc: 'Merzifonlu Kara Mustafa Paşa komutasındaki ordunun başarısızlığı ve Kutsal İttifak taarruzlarının başlaması.', emoji: '📉' },
-      { id: 'd7', year: 1699, title: 'Karlofça Antlaşması', desc: 'Osmanlı’nın batıda ilk kez devasa miktarda toprak kaybettiği, gerileme devrini başlatan anlaşma.', emoji: '📉' },
-      { id: 'd8', year: 1703, title: 'Edirne Vakası', desc: 'Yeniçeri isyanıyla II. Mustafa tahttan indirilip III. Ahmet tahta çıkarıldı.', emoji: '📉' },
-      { id: 'd9', year: 1711, title: 'Prut Savaşı ve Antlaşması', desc: 'Kaybedilen toprakların geri alınabileceği umudunu doğuran büyük Rusya zaferi.', emoji: '⚔️' },
-      { id: 'd10', year: 1718, title: 'Pasarofça Antlaşması ve Lale Devri', desc: 'Avrupa\'nın üstünlüğünün ilk kez kabul edildiği ve batı tarzı ıslahatların yapıldığı Lale Devri başlangıcı.', emoji: '🌷' },
-      { id: 'd11', year: 1730, title: 'Patrona Halil İsyanı', desc: 'Lale Devri\'ni kanlı bir şekilde kapatan ve III. Ahmet\'i tahttan indiren büyük ayaklanma.', emoji: '📉' },
-      { id: 'd12', year: 1739, title: 'Belgrad Antlaşması', desc: 'Gerileme döneminin en kazançlı antlaşması; Karadeniz\'in son kez Türk gölü sayılması.', emoji: '✍️' },
-      { id: 'd13', year: 1774, title: 'Küçük Kaynarca Antlaşması', desc: 'Kırım bağımsız oldu; halifelik siyasi güç olarak ilk kez kullanıldı ve ilk kez tazminat ödendi.', emoji: '📜' },
-      { id: 'd14', year: 1792, title: 'Yaş Antlaşması', desc: 'Kırım’ın Rusya’ya ait olduğu kabul edildi; gerileme bitti, dağılma başladı.', emoji: '✍️' },
-      { id: 'd15', year: 1808, title: 'Sened-i İttifak', desc: 'II. Mahmut ile Ayanlar arasında imzalanan, padişahın yetkilerini ilk kez sınırlandıran tarihi belge.', emoji: '📜' },
+      { id: 'd1', year: 1590, title: 'Ferhat Paşa Antlaşması', desc: 'Osmanlı Devleti doğuda en geniş sınırlarına ulaştı.', emoji: '📜', kpssTip: 'Osmanlı\'nın doğuda en geniş sınırlara ulaştığı antlaşmadır. Bu dönemden sonra duraklama emareleri belirginleşmiştir.' },
+      { id: 'd2', year: 1606, title: 'Zitvatorok Antlaşması', desc: 'Avusturya kralı Osmanlı padişahına eşit sayıldı, siyasi üstünlük bitti.', emoji: '📜', kpssTip: 'İstanbul Antlaşması (1533) ile kurulan siyasi/protokol üstünlük sona ermiştir. Avusturya arşidükü sadrazama değil doğrudan Padişaha denk sayılmıştır (Diplomatik mütekabiliyet).' },
+      { id: 'd3', year: 1621, title: 'Hotin Seferi', desc: 'Genç Osman\'ın Yeniçeri ocak disiplinsizliğini gördüğü sefer.', emoji: '🛡️', kpssTip: 'II. Osman (Genç Osman) ocağın disiplinsizliğini bizzat görerek Yeniçeri Ocağı\'nı kaldırmaya karar vermiş ancak bu durumu hayatıyla ödemiştir (İlk radikal ıslahatçı padişah).' },
+      { id: 'd4', year: 1639, title: 'Kasr-ı Şirin Antlaşması', desc: 'Bugünkü Türkiye-İran sınırını büyük ölçüde belirleyen antlaşma.', emoji: '✍️', kpssTip: 'IV. Murat (Bağdat Fatihi) dönemindedir. Bugün hala yürürlükte olan ve en uzun süre değişmeden kalan sınırlarımızdan birini çizmiştir.' },
+      { id: 'd5', year: 1669, title: 'Girit’in Fethi', desc: '24 yıllık kuşatmadan sonra Venedik\'ten alınan Akdeniz adası.', emoji: '🏝️', kpssTip: 'Fazıl Ahmet Paşa komutasındadır. Fethin 24 yıl sürmesi Osmanlı donanmasının eski gücünü kaybettiğinin en büyük kanıtıdır.' },
+      { id: 'd6', year: 1672, title: 'Bucaş Antlaşması', desc: 'Lehistan\'dan Podolya alınarak batıda en geniş sınırlara ulaşıldı.', emoji: '📜', kpssTip: 'Osmanlı\'nın batıda en geniş sınırlara ulaştığı antlaşmadır. Toprak kazanılan son büyük antlaşma olma niteliği taşır.' },
+      { id: 'd7', year: 1683, title: 'II. Viyana Kuşatması', desc: 'Merzifonlu Kara Mustafa Paşa komutasındaki kuşatma başarısız oldu.', emoji: '📉', kpssTip: 'Başarısızlık sonrası Kutsal İttifak kurulmuş, Osmanlı batıdan geriye doğru çekilmeye başlamıştır (Bu geri çekilme Sakarya Meydan Savaşı\'na kadar sürecektir).' },
     ]
   },
   {
-    id: 'kurtulus',
-    title: '⭐️ Milli Mücadele ve Cumhuriyet Dönemi',
+    id: 'gerileme',
+    title: '📉 Osmanlı Gerileme Dönemi (1699 - 1792)',
     events: [
-      { id: 'm1', year: 1918, title: 'Mondros Ateşkes Antlaşması', desc: 'Osmanlı Devleti\'ni fiilen bitiren ve Anadolu topraklarını işgallere açık hale getiren teslimiyet belgesi.', emoji: '📉' },
-      { id: 'm2', year: 1919, title: 'Amasya Genelgesi', desc: 'Milli mücadelenin amacı, gerekçesi ve yönteminin ilk kez ihtilal beyannamesi olarak yayınlanması.', emoji: '📢' },
-      { id: 'm3', year: 1919, title: 'Erzurum Kongresi', desc: 'Manda ve himaye fikrinin ilk kez reddedilerek ulusal sınırların (Misak-ı Milli) çizilmesi.', emoji: '🤝' },
-      { id: 'm4', year: 1919, title: 'Sivas Kongresi', desc: 'Tüm yararlı cemiyetlerin tek bir çatı altında birleştirildiği milli meclis havasındaki kongre.', emoji: '🤝' },
-      { id: 'm5', year: 1920, title: 'TBMM’nin Açılması', desc: 'Ulusal egemenliği temsil eden kurucu meclisin Ankara\'da açılması.', emoji: '🏛️' },
-      { id: 'm6', year: 1920, title: 'Sevr Antlaşması', desc: 'Milletimizce yırtılıp atılan, Saltanat Şurası onaylı ama hukuken geçersiz ölü doğmuş antlaşma.', emoji: '📉' },
-      { id: 'm7', year: 1921, title: 'I. İnönü Savaşı', desc: 'Düzenli ordunun Batı cephesindeki ilk askeri zaferi ve ilk anayasanın (Teşkilat-ı Esasiye) kabulü.', emoji: '🎖️' },
-      { id: 'm8', year: 1921, title: 'Sakarya Meydan Muharebesi', desc: 'Mustafa Kemal\'in "Hattı müdafaa yoktur sathı müdafaa vardır" emriyle geri çekilmenin bittiği tarihi zafer.', emoji: '🎖️' },
-      { id: 'm9', year: 1922, title: 'Büyük Taarruz', desc: 'Başkomutanlık Meydan Muharebesi ile düşmanın Anadolu topraklarından tamamen sökülüp atılması.', emoji: '⚔️' },
-      { id: 'm10', year: 1922, title: 'Mudanya Ateşkes Antlaşması', desc: 'Kurtuluş Savaşı\'nın askeri safhasını bitiren; Doğu Trakya, İstanbul ve Boğazlar\'ın savaşsız kurtarıldığı belge.', emoji: '📜' },
-      { id: 'm11', year: 1922, title: 'Saltanatın Kaldırılması', desc: 'Lozan öncesi çift başlılığı önleyen ve hanedan rejimine son veren ilk büyük laik inkılap.', emoji: '👑' },
-      { id: 'm12', year: 1923, title: 'Lozan Barış Antlaşması', desc: 'Yeni Türk devletinin bağımsızlığının tüm dünyaca kayıtsız şartsız tanındığı tarihi barış belgesi.', emoji: '✍️' },
-      { id: 'm13', year: 1923, title: 'Cumhuriyetin İlanı', desc: 'Devletin adının konduğu, rejim krizinin çözüldüğü ve Mustafa Kemal\'in ilk cumhurbaşkanı seçildiği gün.', emoji: '⭐️' },
-      { id: 'm14', year: 1924, title: 'Halifeliğin Kaldırılması', desc: 'Tevhid-i Tedrisat Kanunu\'nun kabulü, Şer\'iye-Evkaf Vekaleti\'nin lağvedilerek devrimin hızlandığı gün.', emoji: '📜' },
-      { id: 'm15', year: 1928, title: 'Harf İnkılabı', desc: 'Latin alfabesine dayalı yeni Türk harflerinin kabul edilerek modern okuma-yazma seferberliğinin başlaması.', emoji: '📝' },
+      { id: 'g1', year: 1699, title: 'Karlofça Antlaşması', desc: 'Batıda ilk kez devasa miktarda toprak kaybedilen antlaşma.', emoji: '📉', kpssTip: 'Gerileme döneminin başlangıcı kabul edilir. Osmanlı ilk kez büyük çapta toprak kaybetmiş, diplomaside savunma pozisyonuna geçmiştir.' },
+      { id: 'g2', year: 1703, title: 'Edirne Vakası', desc: 'Yeniçeri isyanıyla II. Mustafa tahttan indirilip III. Ahmet getirildi.', emoji: '📉', kpssTip: 'Padişahların başkenti Edirne\'ye taşıma dedikodusu üzerine çıkan isyandır. Ordunun yönetim üzerindeki vesayeti pekişmiştir.' },
+      { id: 'g3', year: 1711, title: 'Prut Savaşı ve Antlaşması', desc: 'Kaybedilen toprakların geri alınabileceği umudunu doğuran Rusya zaferi.', emoji: '⚔️', kpssTip: 'Karlofça ile kaybedilen yerlerin geri alınabileceği inancı doğmuştur. Sadrazam Baltacı Mehmet Paşa komutasındadır.' },
+      { id: 'g4', year: 1718, title: 'Pasarofça Antlaşması', desc: 'Lale Devri\'ni başlatan, batının üstünlüğünün ilk kez kabul edildiği antlaşma.', emoji: '🌷', kpssTip: 'Kaybedilen yerleri geri alma umutları sönmüş, mevcut toprakları koruma politikasına geçilmiştir. Batı tarzı ıslahatların yapıldığı Lale Devri başlamıştır.' },
+      { id: 'g5', year: 1730, title: 'Patrona Halil İsyanı', desc: 'Lale Devri\'ni kanlı kapatan ve III. Ahmet\'i tahttan indiren ayaklanma.', emoji: '📉', kpssTip: 'Lale Devri zevk ve sefasına tepki olarak çıkan askeri isyandır. Lale Devri sona ermiş ancak batılılaşma ıslahatları sonraki padişahlarca devam ettirilmiştir.' },
+      { id: 'g6', year: 1739, title: 'Belgrad Antlaşması', desc: 'Gerileme döneminin en kazançlı antlaşması; Karadeniz son kez Türk gölü sayıldı.', emoji: '✍️', kpssTip: 'Fransa\'nın arabuluculuğu ile imzalanmıştır. Bu arabuluculuk nedeniyle Fransa\'ya verilen kapitülasyonlar 1740\'ta sürekli hale getirilmiştir (KPSS\'nin en çok sorduğu tuzak!).' },
+      { id: 'g7', year: 1774, title: 'Küçük Kaynarca Antlaşması', desc: 'Kırım bağımsız oldu; halifelik siyasi güç olarak ilk kez kullanıldı.', emoji: '📜', kpssTip: 'Tamamı Türk ve Müslüman olan bir toprak parçası (Kırım) ilk kez elden çıkmıştır. Padişah, Kırım halkıyla dini bağları korumak için HALİFELİK makamını siyasi amaçla ilk kez antlaşma metnine koydurmuştur.' },
+    ]
+  },
+  {
+    id: 'dagilma',
+    title: '📉 Osmanlı Dağılma Dönemi (1792 - 1918)',
+    events: [
+      { id: 'da1', year: 1792, title: 'Yaş Antlaşması', desc: 'Kırım’ın Rusya’ya ait olduğu kabul edildi; Dağılma dönemi başladı.', emoji: '✍️', kpssTip: 'Kırım\'ın Rusya\'ya ilhakı kesinleşmiş, Osmanlı resmi olarak "Dağılma/Yıkılış" sürecine girmiştir.' },
+      { id: 'da2', year: 1808, title: 'Sened-i İttifak', desc: 'II. Mahmut ile Ayanlar arasında imzalanan yetki kısıtlama belgesi.', emoji: '📜', kpssTip: 'Padişahın yetkilerini kendi isteğiyle sınırlandırdığı İLK belgedir. Magna Carta\'ya benzetilir. Batı etkisi yoktur, tamamen iç dinamiklerle (Ayanlar) gerçekleşmiştir.' },
+      { id: 'da3', year: 1839, title: 'Tanzimat Fermanı', desc: 'Kanun üstünlüğünü ve tüm vatandaşların eşitliğini ilan eden ferman.', emoji: '📜', kpssTip: 'Mustafa Reşit Paşa tarafından okunmuştur. Padişah ilk kez "Kanun Gücünün" üstünlüğünü kabul etmiştir. Anayasal düzene geçişin İLK adımıdır. Milliyetçilik isyanlarını önleme amacı taşır.' },
+      { id: 'da4', year: 1856, title: 'Islahat Fermanı', desc: 'Paris Kongresi öncesi azınlıklara geniş haklar veren ferman.', emoji: '📜', kpssTip: 'Tamamen gayrimüslim tebaaya haklar tanımaya yöneliktir. Avrupalı devletlerin iç işlerimize karışmasını önlemek amacıyla Paris Antlaşması metnine eklenmiştir.' },
+      { id: 'da5', year: 1876, title: 'I. Meşrutiyet & Kanun-i Esasi', desc: 'İlk anayasanın ilanı ve meclisli monarşiye geçiş dönemi.', emoji: '🏛️', kpssTip: 'Türk tarihinin İLK yazılı anayasası (Kanun-i Esasi) ilan edilmiş, halk ilk kez padişahın yanında yönetime ortak olmuştur (Rejim değişikliği).' },
+      { id: 'da6', year: 1908, title: 'II. Meşrutiyet\'in İlanı', desc: 'İttihat ve Terakki baskısı sonucu anayasanın tekrar yürürlüğe girmesi.', emoji: '🏛️', kpssTip: 'Reval Görüşmeleri sonrası Jön Türkler ve İttihatçı subayların isyanıyla ilan edilmiştir. Çok partili hayata geçişin önünü açmıştır.' },
+      { id: 'da7', year: 1918, title: 'Mondros Ateşkes Antlaşması', desc: 'Anadolu topraklarını işgallere açan teslimiyet belgesi.', emoji: '📉', kpssTip: 'Osmanlı Devleti\'ni FİİLEN bitiren anlaşmadır. Özellikle 7. madde (güvenliği tehdit eden herhangi bir stratejik noktayı işgal hakkı) işgallerin hukuki kılıfı olmuştur.' },
+    ]
+  },
+  {
+    id: 'cumhuriyet',
+    title: '⭐️ Cumhuriyet & Milli Mücadele (1918 - 1938+)',
+    events: [
+      { id: 'm1', year: 1919, title: 'Amasya Genelgesi', desc: 'Milli mücadelenin amacı, gerekçesi ve yönteminin ilk kez yayınlanması.', emoji: '📢', kpssTip: 'Milli Mücadele\'nin "İhtilal Beyannamesi"dir. "Milletin bağımsızlığını yine milletin azim ve kararı kurtaracaktır" maddesiyle üstü kapalı olarak milli egemenliğe ve rejim değişikliğine ilk kez işaret edilmiştir.' },
+      { id: 'm2', year: 1919, title: 'Erzurum Kongresi', desc: 'Manda ve himayenin ilk kez reddedilerek ulusal sınırların çizilmesi.', emoji: '🤝', kpssTip: 'Toplanış bakımından bölgesel, aldığı kararlar bakımından ulusaldır. Manda ve himaye İLK kez reddedilmiştir. İlk kez geçici bir hükümet kurulmasından bahsedilmiştir.' },
+      { id: 'm3', year: 1919, title: 'Sivas Kongresi', desc: 'Tüm yararlı cemiyetlerin tek bir çatı altında birleştirildiği kongre.', emoji: '🤝', kpssTip: 'Hem toplanış hem kararlar bakımından tamamen ULUSAL tek kongredir. Tüm cemiyetler "Anadolu ve Rumeli Müdafaa-i Hukuk Cemiyeti" adı altında birleştirilmiştir. Manda ve himaye KESİN olarak reddedilmiştir.' },
+      { id: 'm4', year: 1920, title: 'TBMM’nin Açılması', desc: 'Ulusal egemenliği temsil eden kurucu meclisin Ankara\'da açılması.', emoji: '🏛️', kpssTip: 'Milli egemenlik ilkesi kurumsallaşmıştır. Kurucu ve olağanüstü yetkilere sahip bir meclistir. Meclis hükümeti sistemi uygulanmıştır.' },
+      { id: 'm5', year: 1921, title: 'I. İnönü Savaşı', desc: 'Düzenli ordunun Batı cephesindeki ilk askeri zaferi.', emoji: '🎖️', kpssTip: 'Düzenli ordunun ilk zaferidir. Milat (Moskova Ant., İstiklal Marşı, Londra Konf., Afganistan Dostluk, Teşkilat-ı Esasiye anayasası) gelişmeleri bu zaferin ardından yaşanmıştır.' },
+      { id: 'm6', year: 1921, title: 'Sakarya Meydan Muharebesi', desc: 'Geri çekilmenin bittiği tarihi zafer.', emoji: '🎖️', kpssTip: 'Mustafa Kemal\'e "Gazilik" unvanı ve "Mareşallik" rütbesi verilmiştir. II. Viyana Kuşatması\'ndan (1683) beri süregelen Türk geri çekilmesi bu zaferle son bulmuştur.' },
+      { id: 'm7', year: 1922, title: 'Büyük Taarruz', desc: 'Düşmanın Anadolu topraklarından tamamen sökülüp atılması.', emoji: '⚔️', kpssTip: 'Kurtuluş Savaşı\'nın askeri safhası başarıyla tamamlanmış ve diplomatik safha (ateşkes süreçleri) başlamıştır.' },
+      { id: 'm8', year: 1922, title: 'Mudanya Ateşkes Antlaşması', desc: 'Doğu Trakya, İstanbul ve Boğazlar\'ın savaşsız kurtarıldığı ateşkes.', emoji: '📜', kpssTip: 'Osmanlı Devleti\'nin HUKUKEN sona erdiğinin kanıtıdır; çünkü İtilaf Devletleri başkent İstanbul\'u Osmanlı yerine doğrudan TBMM hükümetine teslim etmiştir.' },
+      { id: 'm9', year: 1922, title: 'Saltanatın Kaldırılması', desc: 'Laiklik yolundaki ilk büyük devrim.', emoji: '👑', kpssTip: 'Osmanlı Devleti resmen sona ermiştir. Lozan Konferansı\'nda İtilaf Devletleri\'nin ikilik çıkarma planı suya düşürülmüştür. Laikliğin ilk aşamasıdır.' },
+      { id: 'm10', year: 1923, title: 'Lozan Barış Antlaşması', desc: 'Bağımsızlığımızın tüm dünyaca kayıtsız şartsız tanındığı tarihi barış belgesi.', emoji: '✍️', kpssTip: 'Yeni Türk Devleti\'nin kurucu tapu senedidir. Sevr antlaşması tamamen tarihe gömülmüştür. Kapitülasyonlar kesin olarak kaldırılmıştır.' },
+      { id: 'm11', year: 1923, title: 'Cumhuriyetin İlanı', desc: 'Devletin adının konduğu ve rejim krizinin çözüldüğü gün.', emoji: '⭐️', kpssTip: 'Devlet başkanlığı krizi çözülmüş, ilk cumhurbaşkanı M. Kemal, ilk başbakan İsmet İnönü, ilk meclis başkanı Fethi Okyar olmuştur. Kabine sistemine geçilmiştir.' },
+      { id: 'm12', year: 1924, title: 'Halifeliğin Kaldırılması', desc: 'Modernleşmenin hızlandığı laiklik devrimi.', emoji: '📜', kpssTip: 'Laiklik ve inkılapların önündeki en büyük engel kaldırılmıştır. Aynı gün Tevhid-i Tedrisat (eğitim birliği) kanunu kabul edilmiş ve Şer\'iye-Evkaf vekaleti kaldırılmıştır.' },
     ]
   }
 ];
@@ -99,17 +124,20 @@ export const TimelineGameScreen: React.FC = () => {
   const [activeMode, setActiveMode] = useState<'explore' | 'game'>('explore');
   const [selectedEra, setSelectedEra] = useState<Era>(HISTORICAL_ERAS[0]);
 
+  // Modal / Detail state
+  const [selectedDetailEvent, setSelectedDetailEvent] = useState<TimelineEvent | null>(null);
+
   // Game specific state with dynamic random subset
   const [gameShuffledEvents, setGameShuffledEvents] = useState<TimelineEvent[]>([]);
   const [userSelection, setUserSelection] = useState<TimelineEvent[]>([]);
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [isCorrectSequence, setIsCorrectSequence] = useState(false);
 
-  // Setup game with a dynamic random subset of 4 events from the 15-event pool
+  // Setup game with a dynamic random subset of 4 events from the selected era's events
   const handleStartGame = (era: Era) => {
     setSelectedEra(era);
     
-    // Grab 4 completely random events from the era's 15 events
+    // Grab 4 completely random events from the era's events
     const pool = [...era.events].sort(() => Math.random() - 0.5);
     const selectedFour = pool.slice(0, 4);
     
@@ -177,7 +205,7 @@ export const TimelineGameScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Era Selector Row */}
+      {/* Era Selector Row - 6 distinct KPSS Eras */}
       <View style={s.eraSelectorContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eraSelectorScroll}>
           {HISTORICAL_ERAS.map((era) => {
@@ -195,7 +223,12 @@ export const TimelineGameScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 <Text style={[s.eraTagText, isSel && s.eraTagTextActive]}>
-                  {era.id === 'kurulus' ? '👑 Kuruluş' : era.id === 'duraklama' ? '📉 Dağılma' : '⭐️ Cumhuriyet'}
+                  {era.id === 'kurulus' && '👑 Kuruluş'}
+                  {era.id === 'yukselis' && '🚀 Yükseliş'}
+                  {era.id === 'duraklama' && '📉 Duraklama'}
+                  {era.id === 'gerileme' && '🥀 Gerileme'}
+                  {era.id === 'dagilma' && '💔 Dağılma'}
+                  {era.id === 'cumhuriyet' && '⭐️ Cumhuriyet'}
                 </Text>
               </TouchableOpacity>
             );
@@ -207,7 +240,7 @@ export const TimelineGameScreen: React.FC = () => {
       {activeMode === 'explore' && (
         <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.exploreContent}>
           <Text style={s.eraTitle}>{selectedEra.title}</Text>
-          <Text style={s.eraDesc}>Aşağıdaki kronolojik akış üzerinden önemli KPSS tarihi dönüm noktalarını inceleyin:</Text>
+          <Text style={s.eraDesc}>Aşağıdaki kronolojik kartlara dokunarak KPSS püf noktalarını ve ÖSYM tüyolarını detaylıca inceleyin:</Text>
 
           <View style={s.timelineContainer}>
             {/* The vertical line */}
@@ -215,7 +248,12 @@ export const TimelineGameScreen: React.FC = () => {
 
             {/* Sort all era events by year to display the full timeline in correct order */}
             {[...selectedEra.events].sort((a, b) => a.year - b.year).map((event, index) => (
-              <View key={event.id} style={s.timelineNodeRow}>
+              <TouchableOpacity
+                key={event.id}
+                style={s.timelineNodeRow}
+                onPress={() => setSelectedDetailEvent(event)}
+                activeOpacity={0.8}
+              >
                 {/* Node circle on the line */}
                 <View style={s.timelineDot}>
                   <View style={s.timelineDotInner} />
@@ -225,12 +263,15 @@ export const TimelineGameScreen: React.FC = () => {
                 <View style={s.eventCard}>
                   <View style={s.eventCardHeader}>
                     <Text style={s.eventYear}>{event.year}</Text>
-                    <Text style={s.eventEmoji}>{event.emoji}</Text>
+                    <View style={s.badgeRow}>
+                      <Text style={s.infoBadge}>ℹ️ Detay</Text>
+                      <Text style={s.eventEmoji}>{event.emoji}</Text>
+                    </View>
                   </View>
                   <Text style={s.eventTitle}>{event.title}</Text>
                   <Text style={s.eventDescText}>{event.desc}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </ScrollView>
@@ -241,7 +282,7 @@ export const TimelineGameScreen: React.FC = () => {
         <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.gameContent}>
           <Text style={s.eraTitle}>🎮 Kronolojik Sıralama Oyunu</Text>
           <Text style={s.eraDesc}>
-            Aşağıdaki 4 olayı **kronolojik olarak (en eskiden en yeniye doğru)** sırasıyla seçin:
+            Aşağıdaki 4 olayı **kronolojik olarak (en eskiden en yeniye doğru)** sırasıyla seçin. Kartlara basarak detaylarını inceleyebilirsiniz:
           </Text>
 
           {/* Shuffled Event Cards */}
@@ -251,25 +292,35 @@ export const TimelineGameScreen: React.FC = () => {
               const isSelected = selectIndex !== -1;
 
               return (
-                <TouchableOpacity
-                  key={event.id}
-                  activeOpacity={0.7}
-                  disabled={isGameFinished}
-                  onPress={() => handleSelectGameEvent(event)}
-                  style={[s.gameCard, isSelected && s.gameCardSelected]}
-                >
-                  <View style={s.gameCardLeft}>
-                    <Text style={s.gameCardEmoji}>{event.emoji}</Text>
-                    <Text style={s.gameCardTitle}>{event.title}</Text>
-                  </View>
-                  
-                  {/* Selection Badge Showing Order: 1, 2, 3, 4 */}
-                  <View style={[s.orderBadge, isSelected && s.orderBadgeActive]}>
-                    <Text style={[s.orderBadgeText, isSelected && s.orderBadgeTextActive]}>
-                      {isSelected ? selectIndex + 1 : '?'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                <View key={event.id} style={s.gameCardWrapper}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    disabled={isGameFinished}
+                    onPress={() => handleSelectGameEvent(event)}
+                    style={[s.gameCard, isSelected && s.gameCardSelected]}
+                  >
+                    <View style={s.gameCardLeft}>
+                      <Text style={s.gameCardEmoji}>{event.emoji}</Text>
+                      <Text style={s.gameCardTitle}>{event.title}</Text>
+                    </View>
+                    
+                    {/* Selection Badge Showing Order: 1, 2, 3, 4 */}
+                    <View style={[s.orderBadge, isSelected && s.orderBadgeActive]}>
+                      <Text style={[s.orderBadgeText, isSelected && s.orderBadgeTextActive]}>
+                        {isSelected ? selectIndex + 1 : '?'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Detay Info Button */}
+                  <TouchableOpacity
+                    style={s.gameCardInfoBtn}
+                    onPress={() => setSelectedDetailEvent(event)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.gameCardInfoText}>ℹ️ Detay</Text>
+                  </TouchableOpacity>
+                </View>
               );
             })}
           </View>
@@ -316,6 +367,41 @@ export const TimelineGameScreen: React.FC = () => {
           )}
         </ScrollView>
       )}
+
+      {/* Premium Event Detail Modal */}
+      <Modal
+        visible={selectedDetailEvent !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedDetailEvent(null)}
+      >
+        <View style={s.modalOverlay}>
+          <SafeAreaView style={s.modalContainer} edges={['top', 'bottom']}>
+            <View style={s.modalHeader}>
+              <View>
+                <Text style={s.modalYearText}>{selectedDetailEvent?.year} Yılı</Text>
+                <Text style={s.modalTitleText}>{selectedDetailEvent?.emoji} {selectedDetailEvent?.title}</Text>
+              </View>
+              <TouchableOpacity
+                style={s.closeBtn}
+                onPress={() => setSelectedDetailEvent(null)}
+              >
+                <Text style={s.closeBtnText}>Kapat ✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.modalContent}>
+              <Text style={s.sectionHeader}>📋 Tarihsel Olay Özeti</Text>
+              <Text style={s.bodyText}>{selectedDetailEvent?.desc}</Text>
+
+              <View style={s.tipBox}>
+                <Text style={s.tipHeader}>💡 ÖSYM KPSS Püf Noktaları (Tuzaklar)</Text>
+                <Text style={s.tipText}>{selectedDetailEvent?.kpssTip}</Text>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -413,12 +499,30 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   eventCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   eventYear: { color: colors.primary, fontSize: fontSize.lg, fontWeight: '800' },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  infoBadge: {
+    backgroundColor: colors.surfaceHighlight,
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    borderWidth: 0.5,
+    borderColor: colors.border
+  },
   eventEmoji: { fontSize: 20 },
   eventTitle: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700', marginBottom: spacing.xs },
   eventDescText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22 },
   
   gameCardsContainer: { gap: spacing.md, marginBottom: spacing.xxl },
+  gameCardWrapper: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center'
+  },
   gameCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -452,6 +556,18 @@ const getStyles = (colors: any) => StyleSheet.create({
   orderBadgeText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '800' },
   orderBadgeTextActive: { color: colors.textInverse },
   
+  gameCardInfoBtn: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceHighlight,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  gameCardInfoText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: '700' },
+  
   verifyBtn: { backgroundColor: colors.primary, paddingVertical: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center', marginVertical: spacing.lg },
   verifyBtnDisabled: { opacity: 0.6 },
   verifyBtnText: { color: colors.textInverse, fontSize: fontSize.md, fontWeight: '800' },
@@ -474,5 +590,56 @@ const getStyles = (colors: any) => StyleSheet.create({
   seqYear: { color: colors.primary, fontSize: fontSize.md, fontWeight: '800', marginRight: spacing.md, width: 44 },
   seqTitle: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
   replayBtn: { backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', marginTop: spacing.xl },
-  replayBtnText: { color: colors.textInverse, fontSize: fontSize.sm, fontWeight: '700' }
+  replayBtnText: { color: colors.textInverse, fontSize: fontSize.sm, fontWeight: '700' },
+
+  // Modal Styles
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999
+  },
+  modalContainer: {
+    width: '92%',
+    height: '75%',
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    overflow: 'hidden'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border
+  },
+  modalYearText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '800' },
+  modalTitleText: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '800', marginTop: 2 },
+  closeBtn: {
+    backgroundColor: colors.surfaceHighlight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  closeBtnText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: '700' },
+  modalBody: { flex: 1 },
+  modalContent: { padding: spacing.xl },
+  sectionHeader: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '800', marginBottom: spacing.sm },
+  bodyText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22, marginBottom: spacing.xl },
+  tipBox: {
+    backgroundColor: colors.primaryGlow,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+    padding: spacing.lg,
+    marginTop: spacing.md
+  },
+  tipHeader: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '800', marginBottom: 6 },
+  tipText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22 }
 });
