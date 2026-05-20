@@ -8,6 +8,8 @@ export interface QuizQuestion {
   id: number;
   type: string;
   question_text: string;
+  subtopic?: string;
+  highlighted_province_ids?: number[];
   options: {
     A: string;
     B: string;
@@ -77,4 +79,7 @@ export type RootStackParamList = {
   Settings: undefined;
   Setup: undefined;
   History: undefined;
+  MapQuizHome: undefined;
+  MapQuiz: undefined;
+  MapQuizResult: undefined;
 };

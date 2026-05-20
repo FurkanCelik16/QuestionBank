@@ -1,13 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Alert,
+  StyleSheet, Animated, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, AppTheme } from '../theme/colors';
 import { useQuizStore } from '../store/useQuizStore';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { OptionButton } from '../components/OptionButton';
+import { TurkeyMapSvg } from '../components/maps/TurkeyMapSvg';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 
@@ -63,6 +64,13 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     const answered = getAnsweredCount();
     const unanswered = totalQuestions - answered;
     if (unanswered > 0) {
+      if (Platform.OS === 'web') {
+        const confirmFinish = window.confirm(`${unanswered} soru boş bırakılacak. Testi bitirmek istiyor musunuz?`);
+        if (confirmFinish) {
+          completeQuiz();
+        }
+        return;
+      }
       Alert.alert(
         'Testi Bitir',
         `${unanswered} soru boş bırakılacak. Testi bitirmek istiyor musunuz?`,
@@ -74,6 +82,14 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleQuit = () => {
+    if (Platform.OS === 'web') {
+      const confirmQuit = window.confirm('Testi bırakmak istediğinize emin misiniz? İlerlemeniz kaybolacaktır.');
+      if (confirmQuit) {
+        resetQuiz();
+        navigation.reset({ index: 0, routes: [{ name: 'TopicSelection' }] });
+      }
+      return;
+    }
     Alert.alert('Testi Bırak', 'İlerlemeniz kaybolacak. Emin misiniz?',
       [{ text: 'İptal', style: 'cancel' },
        { text: 'Bırak', style: 'destructive', onPress: () => {
@@ -114,6 +130,14 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
             <View style={s.qTypeRow}>
               <Text style={s.qType}>{question.type || 'Çoktan Seçmeli'}</Text>
             </View>
+            
+            {/* RENDER INLINE TURKEY MAP FOR MAP-BASED GEOGRAPHY QUESTIONS */}
+            {question.highlighted_province_ids && question.highlighted_province_ids.length > 0 && (
+              <View style={s.mapWrapper}>
+                <TurkeyMapSvg highlightedProvinceIds={question.highlighted_province_ids} />
+              </View>
+            )}
+            
             <Text style={s.questionText}>{question.question_text}</Text>
           </View>
 
@@ -175,7 +199,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: AppTheme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   quitBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
@@ -189,6 +213,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   scrollArea: { flex: 1 },
   scrollContent: { padding: spacing.xxl, paddingTop: spacing.lg },
   questionCard: { backgroundColor: colors.surface, borderRadius: borderRadius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, marginBottom: spacing.xl },
+  mapWrapper: { height: 180, width: '100%', marginVertical: spacing.md, borderRadius: borderRadius.md, overflow: 'hidden', backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border },
   qTypeRow: { marginBottom: spacing.md },
   qType: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
   questionText: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '600', lineHeight: 28 },
