@@ -812,7 +812,7 @@ Notun tamamı Türkçe, son derece akıcı, motive edici ve akademik olarak %100
     contents: [
       {
         role: 'user',
-        parts: [{ text: `[SİSTEM TALİMATI]:\n\${systemPrompt}\n\n[TALEBİM]:\n\${userPrompt}` }],
+        parts: [{ text: `[SİSTEM TALİMATI]:\n${systemPrompt}\n\n[TALEBİM]:\n${userPrompt}` }],
       },
     ],
     systemInstruction: {
