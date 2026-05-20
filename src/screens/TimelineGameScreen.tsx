@@ -1,7 +1,8 @@
 // ========================================
 // KPSS Timeline & Chronology Game (Zaman Tüneli) Screen
 // Includes interactive Timeline Explorer and a Chronological Sorting Game (Idea 6).
-// Features highly expanded event databases and fully dynamic random subsets.
+// Features highly expanded 15-event databases for each era (total 45 events)
+// covering all requested wars and treaties (1. Kosova, 2. Kosova, Niğbolu, Varna, etc.).
 // ========================================
 
 import React, { useState } from 'react';
@@ -32,15 +33,20 @@ const HISTORICAL_ERAS: Era[] = [
     title: '👑 Osmanlı Kuruluş ve Yükselme Dönemi',
     events: [
       { id: 'k1', year: 1302, title: 'Koyunhisar Savaşı', desc: 'Bizans İmparatorluğu ile yapılan ilk savaş ve zafer.', emoji: '⚔️' },
-      { id: 'k2', year: 1326, title: 'Bursa’nın Fethi', desc: 'Bursa fethedilerek Osmanlı Devleti’nin yeni başkenti yapıldı.', emoji: '🏰' },
+      { id: 'k2', year: 1326, title: 'Bursa’nın Fethi', desc: 'Bursa fethedilerek Osmanlı Devleti’nin yeni başkenti yapıldı, ilk gümüş para basıldı.', emoji: '🏰' },
       { id: 'k3', year: 1364, title: 'Sırpsındığı Savaşı', desc: 'İlk Osmanlı-Haçlı savaşı ve Haçlıların bozguna uğratılması.', emoji: '⚔️' },
-      { id: 'k4', year: 1402, title: 'Ankara Savaşı', desc: 'Yıldırım Bayezid ile Timur arasında yapıldı, Fetret Devri başladı.', emoji: '📉' },
-      { id: 'k5', year: 1444, title: 'Edirne-Segedin Antlaşması', desc: 'Osmanlı ile Macarlar arasında imzalanan ilk barış antlaşması.', emoji: '📜' },
-      { id: 'k6', year: 1453, title: 'İstanbul’un Fethi', desc: 'Bizans İmparatorluğu’nun sonu, Yeni Çağ’ın açılışı.', emoji: '🏰' },
-      { id: 'k7', year: 1473, title: 'Otlukbeli Savaşı', desc: 'Fatih Sultan Mehmet’in Akkoyunlu devletine karşı kesin zaferi.', emoji: '⚔️' },
-      { id: 'k8', year: 1514, title: 'Çaldıran Savaşı', desc: 'Yavuz Sultan Selim’in Safevilere karşı kazandığı tarihi doğu zaferi.', emoji: '🛡️' },
-      { id: 'k9', year: 1515, title: 'Turnadağ Savaşı', desc: 'Dulkadiroğullarının yıkılmasıyla Anadolu Türk birliği kesin olarak sağlandı.', emoji: '🤝' },
-      { id: 'k10', year: 1538, title: 'Preveze Deniz Zaferi', desc: 'Barbaros Hayreddin Paşa komutasında Akdeniz Türk gölü haline geldi.', emoji: '⛵' },
+      { id: 'k4', year: 1389, title: 'I. Kosova Savaşı', desc: 'Haçlılara karşı kazanılan büyük zafer; Osmanlı ilk kez top kullandı. I. Murat savaş alanında şehit düştü.', emoji: '🛡️' },
+      { id: 'k5', year: 1396, title: 'Niğbolu Savaşı', desc: 'Yıldırım Bayezid\'in büyük Haçlı ordusunu ezdiği ve Halife\'den "Sultan-ı İklim-i Rum" unvanı aldığı savaş.', emoji: '🎖️' },
+      { id: 'k6', year: 1402, title: 'Ankara Savaşı', desc: 'Yıldırım Bayezid ile Timur arasında yapıldı, Osmanlı yenildi ve Fetret Devri başladı.', emoji: '📉' },
+      { id: 'k7', year: 1444, title: 'Edirne-Segedin Antlaşması', desc: 'Osmanlı ile Macarlar arasında imzalanan ilk yazılı barış antlaşması.', emoji: '📜' },
+      { id: 'k8', year: 1444, title: 'Varna Savaşı', desc: 'Genç yaşta tahtı babasına bırakan II. Mehmet\'in çağrısıyla tekrar tahta çıkan II. Murat\'ın Haçlıları bozguna uğrattığı savaş.', emoji: '⚔️' },
+      { id: 'k9', year: 1448, title: 'II. Kosova Savaşı', desc: 'II. Murat komutasında Haçlıların kesin olarak yenilgiye uğratılmasıyla Türklerin Balkanlar\'dan atılamayacağı kanıtlandı.', emoji: '🛡️' },
+      { id: 'k10', year: 1453, title: 'İstanbul’un Fethi', desc: 'Fatih Sultan Mehmet komutasında İstanbul fethedildi, Doğu Roma yıkıldı, Orta Çağ kapandı.', emoji: '🏰' },
+      { id: 'k11', year: 1473, title: 'Otlukbeli Savaşı', desc: 'Fatih Sultan Mehmet’in Akkoyunlu Uzun Hasan\'ı yenerek Doğu Anadolu sınır güvenliğini sağladığı zafer.', emoji: '⚔️' },
+      { id: 'k12', year: 1514, title: 'Çaldıran Savaşı', desc: 'Yavuz Sultan Selim’in Safevilere karşı kazandığı tarihi doğu zaferi.', emoji: '🛡️' },
+      { id: 'k13', year: 1515, title: 'Turnadağ Savaşı', desc: 'Dulkadiroğullarının yıkılmasıyla Anadolu Türk siyasi birliğinin kesin olarak sağlandığı savaş.', emoji: '🤝' },
+      { id: 'k14', year: 1526, title: 'Mohaç Meydan Muharebesi', desc: 'Kanuni Sultan Süleyman önderliğindeki ordunun Macar ordusunu 2 saatte yenerek dünya tarihinin en kısa meydan zaferini kazandığı savaş.', emoji: '⚔️' },
+      { id: 'k15', year: 1538, title: 'Preveze Deniz Zaferi', desc: 'Barbaros Hayreddin Paşa komutasında Haçlı donanmasının yenilmesiyle Akdeniz\'in Türk gölü haline gelmesi.', emoji: '⛵' },
     ]
   },
   {
@@ -48,31 +54,41 @@ const HISTORICAL_ERAS: Era[] = [
     title: '📉 Osmanlı Duraklama ve Gerileme Dönemi',
     events: [
       { id: 'd1', year: 1590, title: 'Ferhat Paşa Antlaşması', desc: 'Osmanlı Devleti doğuda en geniş sınırlarına ulaştı.', emoji: '📜' },
-      { id: 'd2', year: 1606, title: 'Zitvatorok Antlaşması', desc: 'Avusturya kralı Osmanlı padişahına siyasi olarak eşit sayıldı.', emoji: '📜' },
-      { id: 'd3', year: 1672, title: 'Bucaş Antlaşması', desc: 'Osmanlı Devleti batıda en geniş sınırlarına ulaştı.', emoji: '📜' },
-      { id: 'd4', year: 1699, title: 'Karlofça Antlaşması', desc: 'Osmanlı’nın batıda ilk kez büyük çapta toprak kaybettiği antlaşma.', emoji: '📉' },
-      { id: 'd5', year: 1703, title: 'Edirne Vakası', desc: 'Yeniçeri isyanıyla II. Mustafa tahttan indirilip III. Ahmet tahta çıkarıldı.', emoji: '📉' },
-      { id: 'd6', year: 1718, title: 'Pasarofça Antlaşması ve Lale Devri', desc: 'Pasarofça sonrası başlayan, batı tarzı ıslahatların yapıldığı Lale Devri.', emoji: '🌷' },
-      { id: 'd7', year: 1739, title: 'Belgrad Antlaşması', desc: 'Gerileme döneminin en kazançlı antlaşması; Karadeniz\'in son kez Türk gölü sayılması.', emoji: '✍️' },
-      { id: 'd8', year: 1774, title: 'Küçük Kaynarca Antlaşması', desc: 'Kırım bağımsız oldu; Osmanlı ilk kez savaş tazminatı ödedi.', emoji: '📜' },
-      { id: 'd9', year: 1792, title: 'Yaş Antlaşması', desc: 'Kırım’ın Rusya’ya ait olduğu kabul edildi; gerileme bitti, dağılma başladı.', emoji: '✍️' },
-      { id: 'd10', year: 1808, title: 'Sened-i İttifak', desc: 'II. Mahmut döneminde padişahın yetkilerinin ilk kez sınırlandırılması.', emoji: '📜' },
+      { id: 'd2', year: 1606, title: 'Zitvatorok Antlaşması', desc: 'Avusturya kralı Osmanlı padişahına protokolde eşit sayıldı, siyasi üstünlük sona erdi.', emoji: '📜' },
+      { id: 'd3', year: 1621, title: 'Hotin Seferi', desc: 'Genç Osman\'ın Yeniçeri disiplinsizliğini görerek ocağı kaldırmaya karar verdiği, ancak canıyla ödediği sefer.', emoji: '🛡️' },
+      { id: 'd4', year: 1639, title: 'Kasr-ı Şirin Antlaşması', desc: 'Bağdat Fatihi IV. Murat dönemi; bugünkü Türkiye-İran sınırını büyük ölçüde belirleyen tarihi antlaşma.', emoji: '✍️' },
+      { id: 'd5', year: 1672, title: 'Bucaş Antlaşması', desc: 'Lehistan ile imzalandı, Podolya alındı ve batıda en geniş sınırlara ulaşıldı.', emoji: '📜' },
+      { id: 'd6', year: 1683, title: 'II. Viyana Kuşatması', desc: 'Merzifonlu Kara Mustafa Paşa komutasındaki ordunun başarısızlığı ve Kutsal İttifak taarruzlarının başlaması.', emoji: '📉' },
+      { id: 'd7', year: 1699, title: 'Karlofça Antlaşması', desc: 'Osmanlı’nın batıda ilk kez devasa miktarda toprak kaybettiği, gerileme devrini başlatan anlaşma.', emoji: '📉' },
+      { id: 'd8', year: 1703, title: 'Edirne Vakası', desc: 'Yeniçeri isyanıyla II. Mustafa tahttan indirilip III. Ahmet tahta çıkarıldı.', emoji: '📉' },
+      { id: 'd9', year: 1711, title: 'Prut Savaşı ve Antlaşması', desc: 'Kaybedilen toprakların geri alınabileceği umudunu doğuran büyük Rusya zaferi.', emoji: '⚔️' },
+      { id: 'd10', year: 1718, title: 'Pasarofça Antlaşması ve Lale Devri', desc: 'Avrupa\'nın üstünlüğünün ilk kez kabul edildiği ve batı tarzı ıslahatların yapıldığı Lale Devri başlangıcı.', emoji: '🌷' },
+      { id: 'd11', year: 1730, title: 'Patrona Halil İsyanı', desc: 'Lale Devri\'ni kanlı bir şekilde kapatan ve III. Ahmet\'i tahttan indiren büyük ayaklanma.', emoji: '📉' },
+      { id: 'd12', year: 1739, title: 'Belgrad Antlaşması', desc: 'Gerileme döneminin en kazançlı antlaşması; Karadeniz\'in son kez Türk gölü sayılması.', emoji: '✍️' },
+      { id: 'd13', year: 1774, title: 'Küçük Kaynarca Antlaşması', desc: 'Kırım bağımsız oldu; halifelik siyasi güç olarak ilk kez kullanıldı ve ilk kez tazminat ödendi.', emoji: '📜' },
+      { id: 'd14', year: 1792, title: 'Yaş Antlaşması', desc: 'Kırım’ın Rusya’ya ait olduğu kabul edildi; gerileme bitti, dağılma başladı.', emoji: '✍️' },
+      { id: 'd15', year: 1808, title: 'Sened-i İttifak', desc: 'II. Mahmut ile Ayanlar arasında imzalanan, padişahın yetkilerini ilk kez sınırlandıran tarihi belge.', emoji: '📜' },
     ]
   },
   {
     id: 'kurtulus',
     title: '⭐️ Milli Mücadele ve Cumhuriyet Dönemi',
     events: [
-      { id: 'm1', year: 1919, title: 'Amasya Genelgesi', desc: 'Milli mücadelenin amacı, gerekçesi ve yönteminin ilk kez belirtilmesi.', emoji: '📢' },
-      { id: 'm2', year: 1919, title: 'Erzurum Kongresi', desc: 'Manda ve himaye fikrinin ilk kez reddedilerek ulusal sınırların çizilmesi.', emoji: '🤝' },
-      { id: 'm3', year: 1919, title: 'Sivas Kongresi', desc: 'Tüm yararlı cemiyetlerin Anadolu ve Rumeli M.H.C. altında birleşmesi.', emoji: '🤝' },
-      { id: 'm4', year: 1920, title: 'TBMM’nin Açılması', desc: 'Ulusal egemenliği temsil eden meclisin Ankara\'da kurulması.', emoji: '🏛️' },
-      { id: 'm5', year: 1920, title: 'Sevr Antlaşması', desc: 'Osmanlı\'yı parçalayan, Türk milletince geçersiz kılınan antlaşma.', emoji: '📉' },
-      { id: 'm6', year: 1921, title: 'I. İnönü Savaşı', desc: 'Yeni kurulan düzenli ordunun Batı cephesindeki ilk askeri zaferi.', emoji: '🎖️' },
-      { id: 'm7', year: 1921, title: 'Sakarya Meydan Muharebesi', desc: 'II. Viyana\'dan beri süren geri çekilmenin bittiği tarihi zafer.', emoji: '🎖️' },
-      { id: 'm8', year: 1922, title: 'Büyük Taarruz', desc: 'Başkomutanlık Meydan Muharebesi ile düşmanın yurttan tamamen temizlenmesi.', emoji: '⚔️' },
-      { id: 'm9', year: 1922, title: 'Saltanatın Kaldırılması', desc: 'Cumhuriyet ilanı yolundaki ilk büyük laik demokratik inkılap.', emoji: '👑' },
-      { id: 'm10', year: 1923, title: 'Lozan Barış Antlaşması', desc: 'Yeni Türk devletinin bağımsızlığının tüm dünyaca hukuken tanınması.', emoji: '✍️' },
+      { id: 'm1', year: 1918, title: 'Mondros Ateşkes Antlaşması', desc: 'Osmanlı Devleti\'ni fiilen bitiren ve Anadolu topraklarını işgallere açık hale getiren teslimiyet belgesi.', emoji: '📉' },
+      { id: 'm2', year: 1919, title: 'Amasya Genelgesi', desc: 'Milli mücadelenin amacı, gerekçesi ve yönteminin ilk kez ihtilal beyannamesi olarak yayınlanması.', emoji: '📢' },
+      { id: 'm3', year: 1919, title: 'Erzurum Kongresi', desc: 'Manda ve himaye fikrinin ilk kez reddedilerek ulusal sınırların (Misak-ı Milli) çizilmesi.', emoji: '🤝' },
+      { id: 'm4', year: 1919, title: 'Sivas Kongresi', desc: 'Tüm yararlı cemiyetlerin tek bir çatı altında birleştirildiği milli meclis havasındaki kongre.', emoji: '🤝' },
+      { id: 'm5', year: 1920, title: 'TBMM’nin Açılması', desc: 'Ulusal egemenliği temsil eden kurucu meclisin Ankara\'da açılması.', emoji: '🏛️' },
+      { id: 'm6', year: 1920, title: 'Sevr Antlaşması', desc: 'Milletimizce yırtılıp atılan, Saltanat Şurası onaylı ama hukuken geçersiz ölü doğmuş antlaşma.', emoji: '📉' },
+      { id: 'm7', year: 1921, title: 'I. İnönü Savaşı', desc: 'Düzenli ordunun Batı cephesindeki ilk askeri zaferi ve ilk anayasanın (Teşkilat-ı Esasiye) kabulü.', emoji: '🎖️' },
+      { id: 'm8', year: 1921, title: 'Sakarya Meydan Muharebesi', desc: 'Mustafa Kemal\'in "Hattı müdafaa yoktur sathı müdafaa vardır" emriyle geri çekilmenin bittiği tarihi zafer.', emoji: '🎖️' },
+      { id: 'm9', year: 1922, title: 'Büyük Taarruz', desc: 'Başkomutanlık Meydan Muharebesi ile düşmanın Anadolu topraklarından tamamen sökülüp atılması.', emoji: '⚔️' },
+      { id: 'm10', year: 1922, title: 'Mudanya Ateşkes Antlaşması', desc: 'Kurtuluş Savaşı\'nın askeri safhasını bitiren; Doğu Trakya, İstanbul ve Boğazlar\'ın savaşsız kurtarıldığı belge.', emoji: '📜' },
+      { id: 'm11', year: 1922, title: 'Saltanatın Kaldırılması', desc: 'Lozan öncesi çift başlılığı önleyen ve hanedan rejimine son veren ilk büyük laik inkılap.', emoji: '👑' },
+      { id: 'm12', year: 1923, title: 'Lozan Barış Antlaşması', desc: 'Yeni Türk devletinin bağımsızlığının tüm dünyaca kayıtsız şartsız tanındığı tarihi barış belgesi.', emoji: '✍️' },
+      { id: 'm13', year: 1923, title: 'Cumhuriyetin İlanı', desc: 'Devletin adının konduğu, rejim krizinin çözüldüğü ve Mustafa Kemal\'in ilk cumhurbaşkanı seçildiği gün.', emoji: '⭐️' },
+      { id: 'm14', year: 1924, title: 'Halifeliğin Kaldırılması', desc: 'Tevhid-i Tedrisat Kanunu\'nun kabulü, Şer\'iye-Evkaf Vekaleti\'nin lağvedilerek devrimin hızlandığı gün.', emoji: '📜' },
+      { id: 'm15', year: 1928, title: 'Harf İnkılabı', desc: 'Latin alfabesine dayalı yeni Türk harflerinin kabul edilerek modern okuma-yazma seferberliğinin başlaması.', emoji: '📝' },
     ]
   }
 ];
@@ -89,11 +105,11 @@ export const TimelineGameScreen: React.FC = () => {
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [isCorrectSequence, setIsCorrectSequence] = useState(false);
 
-  // Setup game with a dynamic random subset of 4 events from the 10-event pool
+  // Setup game with a dynamic random subset of 4 events from the 15-event pool
   const handleStartGame = (era: Era) => {
     setSelectedEra(era);
     
-    // Grab 4 completely random events from the era's 10 events
+    // Grab 4 completely random events from the era's 15 events
     const pool = [...era.events].sort(() => Math.random() - 0.5);
     const selectedFour = pool.slice(0, 4);
     
