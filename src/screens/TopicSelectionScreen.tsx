@@ -34,8 +34,12 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
     selectedTopics, questionCount, difficulty, 
     setSelectedTopics, setQuestionCount, setDifficulty,
     pdfUri, pdfName, setPdfContext, clearPdfContext,
-    pdfPageRange, setPdfPageRange
+    pdfPageRange, setPdfPageRange, loadPdfContext
   } = useQuizStore();
+  
+  React.useEffect(() => {
+    loadPdfContext();
+  }, []);
   
   const [isPicking, setIsPicking] = useState(false);
   const [activeTab, setActiveTab] = useState<'tarih' | 'cografya' | 'harita'>('tarih');

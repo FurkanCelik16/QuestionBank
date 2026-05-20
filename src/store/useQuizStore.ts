@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { QuizQuestion, QuizResult, DifficultyLevel } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface QuizState {
   // Config
@@ -41,6 +42,7 @@ interface QuizState {
   setPdfContext: (uri: string | null, base64: string | null, name: string | null, geminiUri?: string | null) => void;
   clearPdfContext: () => void;
   setPdfPageRange: (range: string | null) => void;
+  loadPdfContext: () => Promise<void>;
   resetQuiz: () => void;
   resetQuizKeepTopics: () => void;
 
@@ -116,16 +118,73 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   setError: (error) => set({ error }),
 
-  setPdfContext: (uri, base64, name, geminiUri) => set({ 
-    pdfUri: uri, 
-    pdfBase64: base64, 
-    pdfName: name, 
-    geminiFileUri: geminiUri || null 
-  }),
+  setPdfContext: (uri, base64, name, geminiUri) => {
+    set({ 
+      pdfUri: uri, 
+      pdfBase64: base64, 
+      pdfName: name, 
+      geminiFileUri: geminiUri || null 
+    });
+    try {
+      if (uri) AsyncStorage.setItem('@kpss_pdf_uri', uri);
+      else AsyncStorage.removeItem('@kpss_pdf_uri');
 
-  clearPdfContext: () => set({ pdfUri: null, pdfBase64: null, pdfName: null, geminiFileUri: null, pdfPageRange: null }),
+      if (base64) AsyncStorage.setItem('@kpss_pdf_base_64', base64);
+      else AsyncStorage.removeItem('@kpss_pdf_base_64');
 
-  setPdfPageRange: (range) => set({ pdfPageRange: range }),
+      if (name) AsyncStorage.setItem('@kpss_pdf_name', name);
+      else AsyncStorage.removeItem('@kpss_pdf_name');
+
+      if (geminiUri) AsyncStorage.setItem('@kpss_gemini_file_uri', geminiUri);
+      else AsyncStorage.removeItem('@kpss_gemini_file_uri');
+    } catch (e) {
+      console.warn('Persist PDF error:', e);
+    }
+  },
+
+  clearPdfContext: () => {
+    set({ pdfUri: null, pdfBase64: null, pdfName: null, geminiFileUri: null, pdfPageRange: null });
+    try {
+      AsyncStorage.removeItem('@kpss_pdf_uri');
+      AsyncStorage.removeItem('@kpss_pdf_base_64');
+      AsyncStorage.removeItem('@kpss_pdf_name');
+      AsyncStorage.removeItem('@kpss_gemini_file_uri');
+      AsyncStorage.removeItem('@kpss_pdf_page_range');
+    } catch (e) {
+      console.warn('Clear PDF persist error:', e);
+    }
+  },
+
+  setPdfPageRange: (range) => {
+    set({ pdfPageRange: range });
+    try {
+      if (range) AsyncStorage.setItem('@kpss_pdf_page_range', range);
+      else AsyncStorage.removeItem('@kpss_pdf_page_range');
+    } catch (e) {
+      console.warn('Persist PDF range error:', e);
+    }
+  },
+
+  loadPdfContext: async () => {
+    try {
+      const [uri, base64, name, geminiUri, range] = await Promise.all([
+        AsyncStorage.getItem('@kpss_pdf_uri'),
+        AsyncStorage.getItem('@kpss_pdf_base_64'),
+        AsyncStorage.getItem('@kpss_pdf_name'),
+        AsyncStorage.getItem('@kpss_gemini_file_uri'),
+        AsyncStorage.getItem('@kpss_pdf_page_range'),
+      ]);
+      set({
+        pdfUri: uri,
+        pdfBase64: base64,
+        pdfName: name,
+        geminiFileUri: geminiUri,
+        pdfPageRange: range,
+      });
+    } catch (e) {
+      console.warn('Persisted PDF load error:', e);
+    }
+  },
 
   resetQuiz: () => {
     set({
