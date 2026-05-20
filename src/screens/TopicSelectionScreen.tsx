@@ -106,7 +106,7 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
         }
 
         // Upload directly to Gemini Files API
-        const geminiUri = await uploadToGeminiFiles(base64, asset.name, apiKey);
+        const geminiUri = await uploadToGeminiFiles(base64, asset.name, apiKey, Platform.OS !== 'web' ? asset.uri : null);
 
         setPdfContext(asset.uri, base64, asset.name, geminiUri);
 

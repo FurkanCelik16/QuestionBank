@@ -5,6 +5,8 @@
 
 import { Quiz, QuizQuestion, DifficultyLevel } from '../types';
 import { useSettingsStore, cleanSubtopics } from '../store/useSettingsStore';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const TIMEOUT_MS = 120000; // 120 seconds timeout for processing PDFs and generating 20 questions
 
@@ -486,18 +488,29 @@ Her soruda "subtopic" alanı olsun.`;
 export async function uploadToGeminiFiles(
   base64: string,
   fileName: string,
-  apiKey: string
+  apiKey: string,
+  fileUri?: string | null
 ): Promise<string> {
   if (!apiKey) {
     throw new Error('API anahtarı bulunamadı.');
   }
 
   const mimeType = 'application/pdf';
+  let fileLength: number;
+  let uploadBody: any;
 
-  // 1. Convert base64 to native Blob using native fetch (robust on Android, iOS, and Web)
-  const blobRes = await fetch(`data:${mimeType};base64,${base64}`);
-  const blob = await blobRes.blob();
-  const fileLength = blob.size;
+  if (Platform.OS !== 'web' && fileUri) {
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      throw new Error('Yerel dosya bulunamadı.');
+    }
+    fileLength = fileInfo.size;
+  } else {
+    const blobRes = await fetch(`data:${mimeType};base64,${base64}`);
+    const blob = await blobRes.blob();
+    fileLength = blob.size;
+    uploadBody = blob;
+  }
 
   // 2. Start resumable upload session
   const initUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
@@ -527,37 +540,66 @@ export async function uploadToGeminiFiles(
     throw new Error('Google Dosya Servisi yükleme adresi (x-goog-upload-url) döndürmedi.');
   }
 
-  // 3. Perform the binary upload with native Blob (removing the restricted Content-Length header)
-  const uploadRes = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      'X-Goog-Upload-Offset': '0',
-      'X-Goog-Upload-Command': 'upload, finalize',
-    },
-    body: blob,
-  });
+  // 3. Perform the binary upload
+  if (Platform.OS !== 'web' && fileUri) {
+    const uploadRes = await FileSystem.uploadAsync(uploadUrl, fileUri, {
+      httpMethod: 'POST',
+      headers: {
+        'X-Goog-Upload-Offset': '0',
+        'X-Goog-Upload-Command': 'upload, finalize',
+      },
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    });
 
-  if (!uploadRes.ok) {
-    const errorText = await uploadRes.text();
-    throw new Error(`Google Dosya Yüklemesi başarısız oldu (${uploadRes.status}): ${errorText}`);
+    if (uploadRes.status < 200 || uploadRes.status >= 300) {
+      throw new Error(`Google Dosya Yüklemesi başarısız oldu (${uploadRes.status}): ${uploadRes.body}`);
+    }
+
+    const uploadResult = JSON.parse(uploadRes.body);
+    const finalFileUri = uploadResult.file?.uri;
+    const fileId = uploadResult.file?.name;
+
+    if (!finalFileUri || !fileId) {
+      throw new Error('Google Dosya Kayıt Adresi boş döndü.');
+    }
+
+    return await pollUploadedFile(fileId, apiKey);
+  } else {
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Offset': '0',
+        'X-Goog-Upload-Command': 'upload, finalize',
+      },
+      body: uploadBody,
+    });
+
+    if (!uploadRes.ok) {
+      const errorText = await uploadRes.text();
+      throw new Error(`Google Dosya Yüklemesi başarısız oldu (${uploadRes.status}): ${errorText}`);
+    }
+
+    const uploadResult = await uploadRes.json();
+    const finalFileUri = uploadResult.file?.uri;
+    const fileId = uploadResult.file?.name;
+
+    if (!finalFileUri || !fileId) {
+      throw new Error('Google Dosya Kayıt Adresi boş döndü.');
+    }
+
+    return await pollUploadedFile(fileId, apiKey);
   }
+}
 
-  const uploadResult = await uploadRes.json();
-  const fileUri = uploadResult.file?.uri;
-  const fileId = uploadResult.file?.name; // e.g. "files/abcdef123"
-
-  if (!fileUri || !fileId) {
-    throw new Error('Google Dosya Kayıt Adresi boş döndü.');
-  }
-
-  // 4. Poll the file status until it is ACTIVE (or FAILED)
-  // This is vital so the Gemini model doesn't hit a 400 or processing error!
+/**
+ * Poll the file status until it is ACTIVE.
+ */
+async function pollUploadedFile(fileId: string, apiKey: string): Promise<string> {
   let isProcessed = false;
   const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${fileId}?key=${apiKey}`;
   const maxPolls = 15;
 
   for (let i = 0; i < maxPolls; i++) {
-    // Wait 1.5 seconds before checking
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
@@ -583,7 +625,7 @@ export async function uploadToGeminiFiles(
     throw new Error('PDF belgesi zaman aşımı nedeniyle tam olarak işlenemedi. Lütfen tekrar deneyin.');
   }
 
-  return fileUri;
+  return `https://generativelanguage.googleapis.com/v1beta/${fileId}`;
 }
 
 /**
