@@ -20,6 +20,13 @@ interface QuizState {
   isGenerating: boolean;
   error: string | null;
 
+  // PDF Context
+  pdfUri: string | null;
+  pdfBase64: string | null;
+  pdfName: string | null;
+  geminiFileUri: string | null;
+  pdfPageRange: string | null;
+
   // Actions
   setSelectedTopics: (topics: string[]) => void;
   setQuestionCount: (count: number) => void;
@@ -31,6 +38,9 @@ interface QuizState {
   goToQuestion: (index: number) => void;
   setGenerating: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setPdfContext: (uri: string | null, base64: string | null, name: string | null, geminiUri?: string | null) => void;
+  clearPdfContext: () => void;
+  setPdfPageRange: (range: string | null) => void;
   resetQuiz: () => void;
   resetQuizKeepTopics: () => void;
 
@@ -51,6 +61,11 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   userAnswers: {},
   isGenerating: false,
   error: null,
+  pdfUri: null,
+  pdfBase64: null,
+  pdfName: null,
+  geminiFileUri: null,
+  pdfPageRange: null,
 
   setSelectedTopics: (topics) => set({ selectedTopics: topics }),
   
@@ -101,6 +116,17 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   setError: (error) => set({ error }),
 
+  setPdfContext: (uri, base64, name, geminiUri) => set({ 
+    pdfUri: uri, 
+    pdfBase64: base64, 
+    pdfName: name, 
+    geminiFileUri: geminiUri || null 
+  }),
+
+  clearPdfContext: () => set({ pdfUri: null, pdfBase64: null, pdfName: null, geminiFileUri: null, pdfPageRange: null }),
+
+  setPdfPageRange: (range) => set({ pdfPageRange: range }),
+
   resetQuiz: () => {
     set({
       selectedTopics: [],
@@ -110,6 +136,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       isGenerating: false,
       error: null,
       difficulty: 'medium',
+      pdfPageRange: null,
     });
   },
 
