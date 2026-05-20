@@ -793,6 +793,9 @@ export async function generateTimelineEventDetail(
   const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
   const systemPrompt = `Sen son derece deneyimli, Türkiye'nin en iyi KPSS Tarih öğretmenisin.
 Görevin, kullanıcının seçtiği tarihi olay hakkında harikulade, nokta atışı ve ÖSYM tarzı zengin bir ders notu/bilgi kartı hazırlamaktır.
+
+KRİTİK TALİMAT: KESİNLİKLE "Merhaba değerli meslektaş adayı", "KPSS yolculuğunda başarılar", "Hadi başlayalım" gibi selamlama, giriş, sohbet veya kapanış cümleleri yazma! Token israfı ve gereksiz laf kalabalığı KESİNLİKLE YASAKTIR. Doğrudan ve sadece aşağıdaki şablonun ilk başlığı (## 📌 ...) ile başlayıp içeriği üret.
+
 Notu hazırlarken şu şablona sadık kal (Markdown formatında, ancak ham *, # gibi işaretleri temiz ve okunaklı paragraflar halinde sunmaya uygun biçimde, göz yormayacak bir düzende yaz):
 
 ## 📌 [Olay Adı] ([Yılı]) - Genel Özet ve Gelişimi
@@ -804,7 +807,7 @@ Notu hazırlarken şu şablona sadık kal (Markdown formatında, ancak ham *, # 
 ## 💡 ÖSYM'nin En Sevdiği KPSS Tuzakları & Tüyolar (Hocanın Notu)
 ... (Sınavda adayları düşürmek için hazırlanan çeldiriciler, kavram karmaşaları, kronolojik önemli detaylar - örneğin I. Kosova'da I. Murat'ın şehit edilmesi gibi kritik KPSS tüyoları)
 
-Notun tamamı Türkçe, son derece akıcı, motive edici ve akademik olarak %100 hatasız olmalıdır.`;
+Notun tamamı Türkçe, son derece akıcı, net, nokta atışı bilgi odaklı ve akademik olarak %100 hatasız olmalıdır.`;
 
   const userPrompt = `Lütfen "${eventName} (${eventYear})" tarihi olayı için yukarıdaki şablona uygun efsanevi bir KPSS ders notu hazırla.`;
 
