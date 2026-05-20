@@ -83,4 +83,6 @@ export type RootStackParamList = {
   MapQuiz: undefined;
   MapQuizResult: undefined;
   MistakeResolver: undefined;
+  SmartIndex: undefined;
+  TimelineGame: undefined;
 };

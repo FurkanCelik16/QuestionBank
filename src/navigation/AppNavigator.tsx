@@ -15,6 +15,8 @@ import { MapQuizHomeScreen } from '../screens/MapQuizHomeScreen';
 import { MapQuizScreen } from '../screens/MapQuizScreen';
 import { MapQuizResultScreen } from '../screens/MapQuizResultScreen';
 import { MistakeResolverScreen } from '../screens/MistakeResolverScreen';
+import { SmartIndexScreen } from '../screens/SmartIndexScreen';
+import { TimelineGameScreen } from '../screens/TimelineGameScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -54,14 +56,30 @@ export const AppNavigator: React.FC = () => {
                 headerRight: () => (
                   <View style={navStyles.headerRightContainer}>
                     <TouchableOpacity
+                      onPress={() => navigation.navigate('TimelineGame')}
+                      style={navStyles.headerBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={navStyles.headerIcon}>⏳</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('SmartIndex')}
+                      style={navStyles.headerBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={navStyles.headerIcon}>🔍</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       onPress={() => navigation.navigate('History')}
                       style={navStyles.headerBtn}
+                      activeOpacity={0.7}
                     >
                       <Text style={navStyles.headerIcon}>📊</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => navigation.navigate('Settings')}
                       style={navStyles.headerBtn}
+                      activeOpacity={0.7}
                     >
                       <Text style={navStyles.headerIcon}>⚙️</Text>
                     </TouchableOpacity>
@@ -138,6 +156,20 @@ export const AppNavigator: React.FC = () => {
               options={{
                 headerShown: false,
                 gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="SmartIndex"
+              component={SmartIndexScreen}
+              options={{
+                headerTitle: 'Akıllı İndeks 🔍',
+              }}
+            />
+            <Stack.Screen
+              name="TimelineGame"
+              component={TimelineGameScreen}
+              options={{
+                headerTitle: 'Zaman Tüneli ⏳',
               }}
             />
           </>

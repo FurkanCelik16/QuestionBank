@@ -533,3 +533,196 @@ export async function uploadToGeminiFiles(
 
   return fileUri;
 }
+
+/**
+ * Generates a brand new, highly similar question testing the exact same concept/subtopic.
+ */
+export async function generateSimilarQuestion(
+  baseQuestion: QuizQuestion,
+  apiKey: string
+): Promise<QuizQuestion> {
+  if (!apiKey) {
+    throw new Error('API anahtarı bulunamadı.');
+  }
+
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+  const systemPrompt = `Sen KPSS alanında uzman, efsanevi bir soru hazırlayıcısın.
+Görevin, sana verilen temel soruyla AYNI mikro kavramı (alt başlığı) ölçen, ancak tamamen farklı bir kurgu, farklı seçenekler ve farklı bir soru köküne sahip yepyeni benzersiz benzer bir soru oluşturmaktır.
+Soru, KPSS standartlarında, zor ve seçici olmalıdır. 5 şıklı olmalıdır (A, B, C, D, E).
+Cevap seçenekleri ve detaylı çözüm analizi (rational_explanation) mutlaka olmalıdır.`;
+
+  const userPrompt = `Aşağıdaki temel soruyla AYNI alt konuyu/kavramı ölçen benzer bir soru hazırla:
+Alt Başlık: ${baseQuestion.subtopic || 'KPSS Kavramı'}
+Temel Soru: ${baseQuestion.question_text}
+Doğru Cevabı: ${baseQuestion.correct_answer} - ${baseQuestion.options[baseQuestion.correct_answer as keyof typeof baseQuestion.options] || ''}
+
+Lütfen JSON formatında ve tam olarak şu şemaya uygun bir nesne dön:
+{
+  "id": 1,
+  "type": "multiple-choice",
+  "question_text": "Soru metni...",
+  "subtopic": "Alt başlık...",
+  "options": {
+    "A": "Seçenek A",
+    "B": "Seçenek B",
+    "C": "Seçenek C",
+    "D": "Seçenek D",
+    "E": "Seçenek E"
+  },
+  "correct_answer": "Doğru şık harfi (A, B, C, D veya E)",
+  "rational_explanation": "Süper detaylı KPSS tarzı akademik çözüm açıklaması...",
+  "highlighted_province_ids": [] // Soru coğrafya haritalı ise vurgulanacak plaka kodları listesi (örn: [6, 34]), yoksa boş bırak veya ekleme.
+}`;
+
+  const requestBody = {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: `[SİSTEM TALİMATI]:\n${systemPrompt}\n\n[TALEBİM]:\n${userPrompt}` }],
+      },
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    generationConfig: {
+      temperature: 0.85,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          id: { type: 'INTEGER' },
+          type: { type: 'STRING' },
+          question_text: { type: 'STRING' },
+          subtopic: { type: 'STRING' },
+          options: {
+            type: 'OBJECT',
+            properties: {
+              A: { type: 'STRING' },
+              B: { type: 'STRING' },
+              C: { type: 'STRING' },
+              D: { type: 'STRING' },
+              E: { type: 'STRING' },
+            },
+            required: ['A', 'B', 'C', 'D', 'E'],
+          },
+          correct_answer: { type: 'STRING' },
+          rational_explanation: { type: 'STRING' },
+          highlighted_province_ids: {
+            type: 'ARRAY',
+            items: { type: 'INTEGER' },
+          },
+        },
+        required: ['id', 'type', 'question_text', 'subtopic', 'options', 'correct_answer', 'rational_explanation'],
+      },
+    },
+  };
+
+  const response = await fetch(`${geminiUrl}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error('Gemini API benzer soru oluşturma hatası: ' + response.statusText);
+  }
+
+  const resultData = await response.json();
+  const textResponse = resultData?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!textResponse) {
+    throw new Error('Yapay zeka geçerli bir soru döndüremedi.');
+  }
+
+  return JSON.parse(textResponse) as QuizQuestion;
+}
+
+/**
+ * Generates an elegant markdown study summary for a specific historical figure or resource.
+ */
+export async function generateSmartIndexSummary(
+  concept: string,
+  category: 'tarih' | 'cografya',
+  apiKey: string,
+  pdfBase64?: string | null,
+  pdfUri?: string | null
+): Promise<string> {
+  if (!apiKey) {
+    throw new Error('API anahtarı bulunamadı.');
+  }
+
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+  const systemPrompt = `Sen KPSS hazırlık alanında efsaneleşmiş, milyonlarca öğrenciye Türkiye derecesi yaptırmış uzman bir KPSS hocasısın.
+Görevin, sana verilen kavramla ilgili, KPSS sınavında %100 karşılarına çıkabilecek en kritik, en kıyıda köşede kalmış akademik ve ÖSYM tarzı detayları içeren, son derece pratik ve akılda kalıcı bir çalışma özeti (Cheat Sheet / Ders Notu) hazırlamaktır.
+Markdown formatını çok şık ve temiz bir şekilde kullan. Önemli yerleri kalın yaz, tablolar ve maddeler kullanarak görsel ezberi kolaylaştır.`;
+
+  const userPrompt = `Lütfen "${concept}" kavramı ile ilgili, KPSS sınav müfredatına tam uyumlu efsanevi bir hızlı tekrar notu oluştur.
+Kategori: ${category === 'tarih' ? 'KPSS Tarih (Islahatlar, Savaşlar, Teşkilat, Padişah Dönemi vb.)' : 'KPSS Coğrafya (Maden Yatakları, Sanayi Tesisleri, Ulaşım vb.)'}
+
+Eğer sana yüklediğim PDF notları varsa, öncelikle o PDF'teki bilgileri tara ve süzgeçten geçir. PDF'te bu kavramla ilgili yer alan detayları asla atlama.
+
+Markdown başlık yapısı şöyle olsun:
+# 👑 ${concept} - KPSS Akıllı Tekrar Notu
+## 📌 En Kritik KPSS Bilgileri (Çıkmış ve Çıkabilecek Sorular)
+... (Buraya efsanevi, tablolu ve maddeli KPSS ders notu gelecek)
+## 💡 Altın Ezber Tüyoları & Şifreler (Hocanın Notu)
+... (Buraya akılda kalıcı şifreler, kodlamalar veya tuzak sorulara karşı uyarılar gelecek)
+
+Notun tamamı Türkçe, son derece akıcı, samimi ve akademik olarak %100 hatasız olmalıdır.`;
+
+  const parts: any[] = [];
+  if (pdfUri) {
+    parts.push({
+      fileData: {
+        fileUri: pdfUri,
+        mimeType: 'application/pdf',
+      },
+    });
+  } else if (pdfBase64) {
+    parts.push({
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: pdfBase64,
+      },
+    });
+  }
+
+  parts.push({ text: `[SİSTEM TALİMATI]:\n${systemPrompt}\n\n[TALEBİM]:\n${userPrompt}` });
+
+  const requestBody = {
+    contents: [
+      {
+        role: 'user',
+        parts: parts,
+      },
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    generationConfig: {
+      temperature: 0.8,
+      maxOutputTokens: 4096,
+    },
+  };
+
+  const response = await fetch(`${geminiUrl}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error('Gemini API özet oluşturma hatası: ' + response.statusText);
+  }
+
+  const resultData = await response.json();
+  const textResponse = resultData?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!textResponse) {
+    throw new Error('Yapay zeka geçerli bir ders notu oluşturamadı.');
+  }
+
+  return textResponse;
+}

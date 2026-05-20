@@ -1,20 +1,23 @@
 // ========================================
 // Mistake Resolver (Hata Defteri) Screen
 // Allows user to re-solve questions they answered incorrectly in past quizzes.
+// Supports dynamic AI-driven "Similar Question Generation" (Hata Takviyesi).
 // ========================================
 
 import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Platform, Alert
+  StyleSheet, Animated, Platform, Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
 import { useHistoryStore } from '../store/useHistoryStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { QuizQuestion } from '../types';
 import { TurkeyMapSvg } from '../components/maps/TurkeyMapSvg';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { generateSimilarQuestion } from '../services/geminiService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'MistakeResolver'>;
@@ -23,6 +26,7 @@ type Props = {
 export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
   const colors = useTheme();
   const { history, solvedWrongIds, markWrongAsSolved } = useHistoryStore();
+  const { apiKey } = useSettingsStore();
   
   // Extract all unique wrong questions that are NOT marked as solved yet
   const wrongQuestions = history.reduce<QuizQuestion[]>((acc, curr) => {
@@ -38,11 +42,16 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
+  // Similar question states
+  const [similarQuestion, setSimilarQuestion] = useState<QuizQuestion | null>(null);
+  const [isGeneratingSimilar, setIsGeneratingSimilar] = useState(false);
+
   // Animations
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const currentQuestion = wrongQuestions[currentIndex];
+  const activeQuestion = similarQuestion || currentQuestion;
 
   const handleSelectOption = (opt: string) => {
     if (isAnswered) return;
@@ -50,27 +59,53 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
     setIsAnswered(true);
   };
 
+  const handleGenerateSimilar = async () => {
+    if (!apiKey) {
+      Alert.alert('API Anahtarı Gerekli', 'Lütfen Ayarlar ekranından API anahtarınızı kontrol edin.');
+      return;
+    }
+    try {
+      setIsGeneratingSimilar(true);
+      const newQuestion = await generateSimilarQuestion(activeQuestion, apiKey);
+      
+      Animated.sequence([
+        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 15, duration: 1, useNativeDriver: true })
+      ]).start(() => {
+        setSimilarQuestion(newQuestion);
+        setSelectedOption(null);
+        setIsAnswered(false);
+        Animated.parallel([
+          Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+          Animated.spring(slideAnim, { toValue: 0, friction: 6, useNativeDriver: true })
+        ]).start();
+      });
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert('Hata', 'Yapay zeka benzer soru oluştururken bir sorun yaşadı. Lütfen tekrar deneyin.');
+    } finally {
+      setIsGeneratingSimilar(false);
+    }
+  };
+
   const handleNext = async () => {
-    // If correct, mark it as solved
-    if (selectedOption === currentQuestion.correct_answer) {
+    // If correct and it was the base question (not similar question), mark it as solved
+    if (!similarQuestion && selectedOption === currentQuestion.correct_answer) {
       await markWrongAsSolved(currentQuestion.id);
     }
 
     // Reset local state
     setSelectedOption(null);
     setIsAnswered(false);
+    setSimilarQuestion(null); // Return to regular mistake flow
 
     // If there is another question, advance
     if (currentIndex < wrongQuestions.length - 1) {
-      // Simple transition animation
       Animated.sequence([
         Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: 15, duration: 1, useNativeDriver: true })
       ]).start(() => {
-        // We do not increment index if it is marked as solved and the array size shrinks dynamically,
-        // but since solvedWrongIds updates, wrongQuestions array will re-filter and shrink!
-        // To be safe, if we solved it correctly, the array size will shrink, so we might just stay on the same index (which is now the next question)!
-        // If they solved it WRONGLY, it remains in the array, so we increment the index.
+        // Only increment index if they didn't solve it correctly (since correctly solved shrinks the wrongQuestions list!)
         if (selectedOption !== currentQuestion.correct_answer) {
           setCurrentIndex(prev => Math.min(prev + 1, wrongQuestions.length - 2));
         }
@@ -81,9 +116,7 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
         ]).start();
       });
     } else {
-      // Last question solved!
       if (selectedOption === currentQuestion.correct_answer) {
-        // If solved correctly, it was the last one, array will become empty!
         setCurrentIndex(0);
       }
     }
@@ -113,7 +146,7 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const isCorrect = selectedOption === currentQuestion.correct_answer;
+  const isCorrect = selectedOption === activeQuestion.correct_answer;
 
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
@@ -124,122 +157,144 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
         <Text style={s.headerTitle}>Hata Defteri 📓</Text>
         <View style={s.progressBadge}>
-          <Text style={s.progressText}>{currentIndex + 1} / {wrongQuestions.length}</Text>
+          <Text style={s.progressText}>
+            {similarQuestion ? 'Benzer Takviye 🔄' : `${currentIndex + 1} / ${wrongQuestions.length}`}
+          </Text>
         </View>
       </View>
 
-      {/* Main Content Area */}
-      <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          {/* Question Card */}
-          <View style={s.questionCard}>
-            <View style={s.qTypeRow}>
-              <Text style={s.qType}>{currentQuestion.subtopic || 'Hata Çözme Modu'}</Text>
-            </View>
-            
-            {/* Inline Map if present in the question */}
-            {currentQuestion.highlighted_province_ids && currentQuestion.highlighted_province_ids.length > 0 && (
-              <View style={s.mapWrapper}>
-                <TurkeyMapSvg highlightedProvinceIds={currentQuestion.highlighted_province_ids} />
-              </View>
-            )}
-
-            <Text style={s.questionText}>{currentQuestion.question_text}</Text>
-          </View>
-
-          {/* Options */}
-          <View style={s.optionsContainer}>
-            {(['A', 'B', 'C', 'D', 'E'] as const).map((opt) => {
-              let optStatus: 'idle' | 'correct' | 'wrong' = 'idle';
-              let isSelected = selectedOption === opt;
-
-              if (isAnswered) {
-                if (opt === currentQuestion.correct_answer) {
-                  optStatus = 'correct';
-                } else if (isSelected) {
-                  optStatus = 'wrong';
-                }
-              }
-
-              // Option-specific colors based on status
-              let cardBg = colors.surface;
-              let borderCol = colors.border;
-              let textCol = colors.textSecondary;
-              let badgeBg = colors.surfaceHighlight;
-              let badgeTextCol = colors.textSecondary;
-
-              if (optStatus === 'correct') {
-                cardBg = colors.successGlow;
-                borderCol = colors.success;
-                textCol = colors.success;
-                badgeBg = colors.success;
-                badgeTextCol = colors.textInverse;
-              } else if (optStatus === 'wrong') {
-                cardBg = colors.errorGlow;
-                borderCol = colors.error;
-                textCol = colors.error;
-                badgeBg = colors.error;
-                badgeTextCol = colors.textInverse;
-              } else if (isSelected) {
-                cardBg = colors.primaryGlow;
-                borderCol = colors.primary;
-                textCol = colors.primary;
-                badgeBg = colors.primary;
-                badgeTextCol = colors.textInverse;
-              } else if (isAnswered) {
-                // Dim other options
-                textCol = colors.textMuted;
-              }
-
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  activeOpacity={0.7}
-                  disabled={isAnswered}
-                  onPress={() => handleSelectOption(opt)}
-                  style={[s.optionBtn, { backgroundColor: cardBg, borderColor: borderCol }]}
-                >
-                  <View style={[s.optionBadge, { backgroundColor: badgeBg }]}>
-                    <Text style={[s.optionBadgeText, { color: badgeTextCol }]}>{opt}</Text>
-                  </View>
-                  <Text style={[s.optionText, { color: textCol, fontWeight: isSelected || optStatus === 'correct' ? '600' : '400' }]}>
-                    {currentQuestion.options[opt]}
+      {/* Generating similar loading overlay */}
+      {isGeneratingSimilar ? (
+        <View style={s.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={s.loadingText}>Yapay Zeka Benzer Soru Hazırlıyor...</Text>
+          <Text style={s.loadingSub}>Aynı konudaki bilginizi pekiştirmeniz için benzersiz bir KPSS sorusu tasarlanıyor.</Text>
+        </View>
+      ) : (
+        <>
+          {/* Main Content Area */}
+          <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+              {/* Question Card */}
+              <View style={s.questionCard}>
+                <View style={s.qTypeRow}>
+                  <Text style={[s.qType, similarQuestion && { color: colors.warning }]}>
+                    {similarQuestion ? '🔄 BENZER PEKİŞTİRME SORUSU' : activeQuestion.subtopic || 'Hata Çözme Modu'}
                   </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                </View>
+                
+                {/* Inline Map if present in the question */}
+                {activeQuestion.highlighted_province_ids && activeQuestion.highlighted_province_ids.length > 0 && (
+                  <View style={s.mapWrapper}>
+                    <TurkeyMapSvg highlightedProvinceIds={activeQuestion.highlighted_province_ids} />
+                  </View>
+                )}
 
-          {/* Solution & Explanation Card */}
+                <Text style={s.questionText}>{activeQuestion.question_text}</Text>
+              </View>
+
+              {/* Options */}
+              <View style={s.optionsContainer}>
+                {(['A', 'B', 'C', 'D', 'E'] as const).map((opt) => {
+                  let optStatus: 'idle' | 'correct' | 'wrong' = 'idle';
+                  let isSelected = selectedOption === opt;
+
+                  if (isAnswered) {
+                    if (opt === activeQuestion.correct_answer) {
+                      optStatus = 'correct';
+                    } else if (isSelected) {
+                      optStatus = 'wrong';
+                    }
+                  }
+
+                  // Option-specific colors based on status
+                  let cardBg = colors.surface;
+                  let borderCol = colors.border;
+                  let textCol = colors.textSecondary;
+                  let badgeBg = colors.surfaceHighlight;
+                  let badgeTextCol = colors.textSecondary;
+
+                  if (optStatus === 'correct') {
+                    cardBg = colors.successGlow;
+                    borderCol = colors.success;
+                    textCol = colors.success;
+                    badgeBg = colors.success;
+                    badgeTextCol = colors.textInverse;
+                  } else if (optStatus === 'wrong') {
+                    cardBg = colors.errorGlow;
+                    borderCol = colors.error;
+                    textCol = colors.error;
+                    badgeBg = colors.error;
+                    badgeTextCol = colors.textInverse;
+                  } else if (isSelected) {
+                    cardBg = colors.primaryGlow;
+                    borderCol = colors.primary;
+                    textCol = colors.primary;
+                    badgeBg = colors.primary;
+                    badgeTextCol = colors.textInverse;
+                  } else if (isAnswered) {
+                    // Dim other options
+                    textCol = colors.textMuted;
+                  }
+
+                  return (
+                    <TouchableOpacity
+                      key={opt}
+                      activeOpacity={0.7}
+                      disabled={isAnswered}
+                      onPress={() => handleSelectOption(opt)}
+                      style={[s.optionBtn, { backgroundColor: cardBg, borderColor: borderCol }]}
+                    >
+                      <View style={[s.optionBadge, { backgroundColor: badgeBg }]}>
+                        <Text style={[s.optionBadgeText, { color: badgeTextCol }]}>{opt}</Text>
+                      </View>
+                      <Text style={[s.optionText, { color: textCol, fontWeight: isSelected || optStatus === 'correct' ? '600' : '400' }]}>
+                        {activeQuestion.options[opt]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Solution & Explanation Card */}
+              {isAnswered && (
+                <View style={[s.explanationCard, isCorrect ? s.successBorder : s.errorBorder]}>
+                  <Text style={[s.feedbackTitle, isCorrect ? s.successText : s.errorText]}>
+                    {isCorrect ? '✅ Tebrikler, Doğru Çözdünüz!' : '❌ Maalesef Yanlış Cevap!'}
+                  </Text>
+                  <Text style={s.feedbackSub}>
+                    {isCorrect 
+                      ? 'Bu soruyu başarıyla kavradınız. Hata Defterinden temizleyip ilerleyebilir veya kendinizi test etmek için benzer yepyeni bir soru üretebilirsiniz!' 
+                      : 'Sorunun doğru cevabını ve detaylı analizini aşağıdan inceleyerek zayıf noktanızı pekiştirebilirsiniz.'}
+                  </Text>
+                  <View style={s.divider} />
+                  <Text style={s.explanationLabel}>Soru Çözüm Analizi:</Text>
+                  <Text style={s.explanationText}>{activeQuestion.rational_explanation}</Text>
+                </View>
+              )}
+            </Animated.View>
+          </ScrollView>
+
+          {/* Footer Navigation Button */}
           {isAnswered && (
-            <View style={[s.explanationCard, isCorrect ? s.successBorder : s.errorBorder]}>
-              <Text style={[s.feedbackTitle, isCorrect ? s.successText : s.errorText]}>
-                {isCorrect ? '✅ Tebrikler, Doğru Çözdünüz!' : '❌ Maalesef Yanlış Cevap!'}
-              </Text>
-              <Text style={s.feedbackSub}>
-                {isCorrect 
-                  ? 'Bu soruyu başarıyla kavradınız. İleri butona basarak bu soruyu Hata Defterinizden kalıcı olarak temizleyebilirsiniz.' 
-                  : 'Sorunun doğru cevabını ve detaylı analizini aşağıdan inceleyerek zayıf noktanızı pekiştirebilirsiniz.'}
-              </Text>
-              <View style={s.divider} />
-              <Text style={s.explanationLabel}>Soru Çözüm Analizi:</Text>
-              <Text style={s.explanationText}>{currentQuestion.rational_explanation}</Text>
+            <View style={s.footer}>
+              {isCorrect ? (
+                <View style={s.footerRow}>
+                  <TouchableOpacity style={[s.nextBtn, { flex: 1.2, backgroundColor: colors.warning }]} onPress={handleGenerateSimilar} activeOpacity={0.8}>
+                    <Text style={s.nextBtnText}>🔄 Benzer Soru Üret</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.nextBtn, { flex: 1.8 }]} onPress={handleNext} activeOpacity={0.8}>
+                    <Text style={s.nextBtnText}>Sil ve İlerle ➡️</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={s.nextBtn} onPress={handleNext} activeOpacity={0.8}>
+                  <Text style={s.nextBtnText}>Sonraki Soruyu Dene ➡️</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
-        </Animated.View>
-      </ScrollView>
-
-      {/* Footer Navigation Button */}
-      {isAnswered && (
-        <View style={s.footer}>
-          <TouchableOpacity style={s.nextBtn} onPress={handleNext} activeOpacity={0.8}>
-            <Text style={s.nextBtnText}>
-              {isCorrect 
-                ? 'Hata Defterinden Sil ve İlerle ➡️' 
-                : 'Sonraki Soruyu Dene ➡️'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </>
       )}
     </SafeAreaView>
   );
@@ -277,6 +332,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.border
   },
   progressText: { color: colors.textPrimary, fontSize: fontSize.xs, fontWeight: '700' },
+  
+  loadingOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl },
+  loadingText: { color: colors.textPrimary, fontSize: fontSize.xl, fontWeight: '800', marginTop: spacing.xl, marginBottom: 8 },
+  loadingSub: { color: colors.textSecondary, fontSize: fontSize.md, textAlign: 'center', lineHeight: 22 },
   
   scrollArea: { flex: 1 },
   scrollContent: { padding: spacing.xxl, paddingTop: spacing.lg },
@@ -333,6 +392,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   explanationText: { color: colors.textSecondary, fontSize: fontSize.md, lineHeight: 24 },
   
   footer: { paddingHorizontal: spacing.xxl, paddingBottom: spacing.xl },
+  footerRow: { flexDirection: 'row', gap: spacing.md },
   nextBtn: { backgroundColor: colors.primary, paddingVertical: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center' },
   nextBtnText: { color: colors.textInverse, fontSize: fontSize.lg, fontWeight: '800' },
   
