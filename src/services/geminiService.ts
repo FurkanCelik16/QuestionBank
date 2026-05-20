@@ -196,6 +196,7 @@ Eğer Coğrafya konuları hakkında soru üretiyorsan, ürettiğin toplam sorula
    - KESİNLİKLE plaka numarası başka bir il (örn: 6-Ankara, 34-İstanbul) iken, soruda ve çözümde başka illeri (örn: Erzurum, Ardahan) kastederek saçma sapan açıklamalar yazma!
    - Erzurum ve Kars'ı sormak istiyorsan, plaka kodları KESİNLİKLE [25, 36] olmalıdır. Ankara ve İstanbul'u sormak istiyorsan plaka kodları KESİNLİKLE [6, 34] olmalıdır.
    - Soru kökünde, seçeneklerde veya çözümde kastedilen her bir ilin Türkiye plaka numarasını aklında doğru eşleştir ve "highlighted_province_ids" dizisini kusursuz bir doğrulukla doldur. Bu kuralın ihlali kesinlikle kabul edilemez bir coğrafi hatadır!
+   - YAZIM VE GÖSTERİM KURALI: Soru metninin (question_text), seçeneklerin (options) veya açıklamanın (rational_explanation) içerisine KESİNLİKLE "[6]", "[34]" veya "[6] ve [34] numaralı iller" gibi plaka kodlarını ham metin ya da parantez içinde SAYI olarak yazma! Haritada zaten bu iller koyu renkle boyalı/işaretli olacağı için soruda bunlardan bahsederken "haritada koyu renkle işaretlenen illerimiz", "işaretli merkezlerin ortak özelliği" gibi son derece doğal coğrafi ifadeler kullan. Plaka numaralarını metin içinde göstermek kesinlikle yasaktır!
 `;
 
   const systemPrompt = (pdfBase64 || pdfUri)
