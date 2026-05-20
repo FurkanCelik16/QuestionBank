@@ -199,12 +199,29 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         activePdf = pdfSlots[selectedSlotId];
       }
 
+      let base64 = activePdf ? activePdf.base64 : null;
+      // If we don't have base64 in stored slots but have a local file uri, load it dynamically!
+      if (activePdf && !base64 && activePdf.uri) {
+        try {
+          const FileSystem = require('expo-file-system');
+          base64 = await FileSystem.readAsStringAsync(activePdf.uri, {
+            encoding: 'base64',
+          });
+          const slot = pdfSlots[selectedSlotId!];
+          if (slot && base64) {
+            slot.base64 = base64;
+          }
+        } catch (err) {
+          console.warn('Startup local PDF read error:', err);
+        }
+      }
+
       set({
         pdfSlots,
         selectedSlotId,
         pdfPageRange: range,
         pdfUri: activePdf ? activePdf.uri : null,
-        pdfBase64: activePdf ? activePdf.base64 : null,
+        pdfBase64: base64,
         pdfName: activePdf ? activePdf.name : null,
         geminiFileUri: activePdf ? activePdf.geminiFileUri : null,
       });
@@ -213,14 +230,31 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     }
   },
 
-  selectPdfSlot: (slotId) => {
+  selectPdfSlot: async (slotId) => {
     const { pdfSlots } = get();
     const activePdf = slotId ? pdfSlots[slotId] : null;
+
+    let base64 = activePdf ? activePdf.base64 : null;
+    if (activePdf && !base64 && activePdf.uri) {
+      try {
+        const FileSystem = require('expo-file-system');
+        base64 = await FileSystem.readAsStringAsync(activePdf.uri, {
+          encoding: 'base64',
+        });
+        // Cache it in-memory
+        const slot = pdfSlots[slotId!];
+        if (slot && base64) {
+          slot.base64 = base64;
+        }
+      } catch (err) {
+        console.warn('Local PDF read on selection error:', err);
+      }
+    }
 
     set({
       selectedSlotId: slotId,
       pdfUri: activePdf ? activePdf.uri : null,
-      pdfBase64: activePdf ? activePdf.base64 : null,
+      pdfBase64: base64,
       pdfName: activePdf ? activePdf.name : null,
       geminiFileUri: activePdf ? activePdf.geminiFileUri : null,
     });
@@ -261,7 +295,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     }
 
     try {
-      AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(updatedSlots));
+      // Strip base64 data to keep AsyncStorage size extremely lightweight!
+      const slotsForStorage = JSON.parse(JSON.stringify(updatedSlots));
+      Object.keys(slotsForStorage).forEach(key => {
+        if (slotsForStorage[key]) {
+          slotsForStorage[key].base64 = '';
+        }
+      });
+
+      AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(slotsForStorage));
       if (shouldSelect) {
         AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
       }

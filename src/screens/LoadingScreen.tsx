@@ -111,7 +111,7 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   const fetchQuiz = async () => {
-    const { pdfBase64, geminiFileUri, pdfPageRange } = useQuizStore.getState();
+    const { pdfBase64, geminiFileUri, pdfPageRange, pdfName, pdfUri } = useQuizStore.getState();
     const { askedQuestions, addAskedQuestions } = useSettingsStore.getState();
 
     // Dynamically calculate the final page range based on selected topics if pdfPageRange is not manually provided
@@ -129,16 +129,30 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     }
 
+    // Lazy load base64 from disk on startup if empty (respects 6MB AsyncStorage limit!)
+    let finalBase64 = pdfBase64;
+    if (!finalBase64 && pdfUri && Platform.OS !== 'web') {
+      try {
+        const FileSystem = require('expo-file-system');
+        finalBase64 = await FileSystem.readAsStringAsync(pdfUri, {
+          encoding: 'base64',
+        });
+      } catch (err) {
+        console.warn('Startup dynamic base64 read for Gemini failed:', err);
+      }
+    }
+
     try {
       const quiz = await generateQuiz(
         selectedTopics,
         questionCount,
         apiKey,
         difficulty,
-        pdfBase64,
+        finalBase64,
         askedQuestions,
         geminiFileUri,
-        finalPageRange
+        finalPageRange,
+        pdfName
       );
 
       // Save new question subtopics to local history

@@ -117,7 +117,8 @@ export async function generateQuiz(
   pdfBase64?: string | null,
   excludeConcepts: string[] = [],
   pdfUri?: string | null,
-  pdfPageRange?: string | null
+  pdfPageRange?: string | null,
+  pdfName?: string | null
 ): Promise<Quiz> {
   if (!apiKey) {
     throw new Error('API anahtarı bulunamadı. Lütfen Ayarlar ekranından API anahtarınızı girin.');
@@ -201,6 +202,10 @@ Eğer Coğrafya konuları hakkında soru üretiyorsan, ürettiğin toplam sorula
    - YAZIM VE GÖSTERİM KURALI: Soru metninin (question_text), seçeneklerin (options) veya açıklamanın (rational_explanation) içerisine KESİNLİKLE "[6]", "[34]" veya "[6] ve [34] numaralı iller" gibi plaka kodlarını ham metin ya da parantez içinde SAYI olarak yazma! Haritada zaten bu iller koyu renkle boyalı/işaretli olacağı için soruda bunlardan bahsederken "haritada koyu renkle işaretlenen illerimiz", "işaretli merkezlerin ortak özelliği" gibi son derece doğal coğrafi ifadeler kullan. Plaka numaralarını metin içinde göstermek kesinlikle yasaktır!
 `;
 
+  const hasGeography = topics.some((t) => t.toLowerCase().includes('cog') || t.toLowerCase().includes('coğrafya') || t.toLowerCase().includes('cografya') || t.toLowerCase().includes('harita')) ||
+    (pdfName && (pdfName.toLowerCase().includes('cografya') || pdfName.toLowerCase().includes('coğrafya') || pdfName.toLowerCase().includes('harita')));
+  const mapInstructionToUse = hasGeography ? geographyMapInstruction : '';
+
   const systemPrompt = (pdfBase64 || pdfUri)
     ? `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${pdfVarietyAndCoverageMandate}
 Sana verilen PDF dokümanını TEK VE MUTLAK KAYNAK olarak kullan. ${pageRangeInstruction}
@@ -222,14 +227,14 @@ ${topics.length > 0
 1. Dokümanın sadece ilk sayfalarıyla veya genel tanımların geçtiği giriş kısımlarıyla sınırlı kalma. Belgenin ortalarındaki, sonlarındaki sayfaları da tam olarak oku ve analiz et.
 2. Tablolardaki verileri, dipnotları, kıyıda köşede kalmış çok spesifik detayları, kanun maddelerini, isimleri, tarihleri ve en ince ayrıntıları özellikle tarayarak buralardan uzmanlık seviyesinde sorular üret.
 3. Genel geçer veya herkesin bildiği bilgiler yerine, dokümana has olan, derin KPSS/ÖSYM mantığına uygun ve adayları eleyecek nitelikte seçici detaylara odaklan.
-${excludeInstruction}${extremeMandate}${geographyMapInstruction}
+${excludeInstruction}${extremeMandate}${mapInstructionToUse}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`
     : `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${varietyAndCoverageMandate}
 MÜFREDAT BİLGİSİ:
 Aşağıdaki KPSS müfredatı detaylarını referans al ve YALNIZCA seçilen şu konular [${topicsString}] hakkında soru sor. Diğer konulara kesinlikle girme:
 ${syllabusContext}
-${excludeInstruction}${extremeMandate}${geographyMapInstruction}
+${excludeInstruction}${extremeMandate}${mapInstructionToUse}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`;
 
@@ -888,7 +893,17 @@ Notun tamamı Türkçe, son derece akıcı, net, nokta atışı bilgi odaklı ve
  */
 export function cleanPlakaFromText(text: string): string {
   if (!text) return '';
-  let cleaned = text.replace(/\[\d+\]\s*numaralı\s*il(?:imiz| olan)?\s*/gi, '');
+  // Clean plural lists like [8, 25, 36] numaralı alanlarda / illerde
+  let cleaned = text.replace(/\[\d+(?:\s*,\s*\d+)*\]\s*numaralı\s*(?:il(?:imiz|ler|lerin|leri|lerden)?|alan(?:lar|larda|lardan)?|bölge(?:ler|lerde|lerden)?)/gi, 'işaretli yerler');
+  
+  // Clean [8, 25, 36] numaralı
+  cleaned = cleaned.replace(/\[\d+(?:\s*,\s*\d+)*\]\s*numaralı/gi, 'işaretli');
+  
+  // Clean standalone [8, 25, 36]
+  cleaned = cleaned.replace(/\[\d+(?:\s*,\s*\d+)*\]/gi, '');
+  
+  // Clean single ones
+  cleaned = cleaned.replace(/\[\d+\]\s*numaralı\s*il(?:imiz| olan)?\s*/gi, '');
   cleaned = cleaned.replace(/\[\d+\]\s*numaralı\s*/gi, '');
   cleaned = cleaned.replace(/\s*\(\s*\[\d+\]\s*\)/gi, '');
   cleaned = cleaned.replace(/\[\d+\]/gi, '');
