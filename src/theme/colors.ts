@@ -36,8 +36,48 @@ export const fontSize = {
   display: 42,
 } as const;
 
+export interface AppTheme {
+  background: string;
+  surface: string;
+  surfaceLight: string;
+  surfaceHighlight: string;
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  primaryGlow: string;
+  accent: string;
+  accentGlow: string;
+  success: string;
+  successDark: string;
+  successGlow: string;
+  error: string;
+  errorDark: string;
+  errorGlow: string;
+  warning: string;
+  warningDark: string;
+  warningGlow: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  textInverse: string;
+  border: string;
+  borderLight: string;
+  gradientPrimary: readonly string[];
+  gradientAccent: readonly string[];
+  gradientSuccess: readonly string[];
+  gradientError: readonly string[];
+  gradientSurface: readonly string[];
+  gradientBackground: readonly string[];
+  tarih: string;
+  tarihGlow: string;
+  cografya: string;
+  cografyaGlow: string;
+  overlay: string;
+  overlayLight: string;
+}
+
 // Theme Definitions
-export const darkTheme = {
+export const darkTheme: AppTheme = {
   // Backgrounds
   background: '#0F172A',      // Slate 900
   surface: '#1E293B',         // Slate 800
@@ -96,7 +136,7 @@ export const darkTheme = {
   overlayLight: 'rgba(15, 23, 42, 0.4)',
 };
 
-export const lightTheme: typeof darkTheme = {
+export const lightTheme: AppTheme = {
   // Backgrounds
   background: '#F8FAFC',      // Slate 50
   surface: '#FFFFFF',         // White

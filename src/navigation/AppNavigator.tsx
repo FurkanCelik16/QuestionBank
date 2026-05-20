@@ -11,6 +11,9 @@ import { QuizScreen } from '../screens/QuizScreen';
 import { ResultScreen } from '../screens/ResultScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
+import { MapQuizHomeScreen } from '../screens/MapQuizHomeScreen';
+import { MapQuizScreen } from '../screens/MapQuizScreen';
+import { MapQuizResultScreen } from '../screens/MapQuizResultScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -103,6 +106,29 @@ export const AppNavigator: React.FC = () => {
               component={HistoryScreen}
               options={{
                 headerTitle: '',
+              }}
+            />
+            <Stack.Screen
+              name="MapQuizHome"
+              component={MapQuizHomeScreen}
+              options={{
+                headerTitle: 'Harita Tahmin',
+              }}
+            />
+            <Stack.Screen
+              name="MapQuiz"
+              component={MapQuizScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="MapQuizResult"
+              component={MapQuizResultScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
               }}
             />
           </>
