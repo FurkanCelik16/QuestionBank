@@ -187,11 +187,15 @@ Bu test UZMAN / AKADEMİK seviyededir.
     : '';
 
   const geographyMapInstruction = `
-[!!! COĞRAFYA HARİTALI SORU TALİMATI - SON DERECE KRİTİK !!!]:
+[!!! COĞRAFYA HARİTALI SORU TALİMATI - SON DERECE KRİTİK VE MUTLAK ZORUNLU !!!]:
 Eğer Coğrafya konuları hakkında soru üretiyorsan, ürettiğin toplam soruların en az %30'unu (örn: 10 soruluk bir testte en az 3 soruyu) **Türkiye Haritalı Soru** olarak tasarla.
 1. Haritalı sorularda, haritada vurgulanmasını ve işaretlenmesini istediğin illerin plaka kodlarını (1-81 arası tamsayılar, örn: Rize için [53], Muğla için [48], Konya için [42], İzmir için [35]) "highlighted_province_ids" alanına bir dizi olarak ekle. (Haritasız normal sorularda bu alanı tamamen boş bırak veya ekleme).
-2. Soru metninde haritaya açıkça atıfta bulun. Örnek: "Yukarıdaki Türkiye haritasında koyu renkle işaretlenerek gösterilen ilimiz için aşağıdakilerden hangisi söylenemez?" ya da "Haritada işaretlenen bölgelerin ortak coğrafi özelliği aşağıdakilerden hangisidir?" ya da "Haritada numaralandırılarak gösterilen illerden hangisinde..." gibi ifadeler kullan.
-3. Vurguladığın illeri soru ve şıklarda tutarlı bir şekilde kullan.
+2. Soru metninde haritaya açıkça atıfta bulun. Örnek: "Yukarıdaki Türkiye haritasında koyu renkle işaretlenerek gösterilen ilimiz için aşağıdakilerden hangisi söylenemez?" ya da "Haritada işaretlenen bölgelerin ortak coğrafi özelliği aşağıdakilerden hangisidir?" gibi ifadeler kullan.
+3. ÇOK KRİTİK COĞRAFİ UYUMLULUK VE KURAL:
+   - "highlighted_province_ids" içine yazdığın plaka numaraları ile soru metninde ve çözüm açıklamasında (rational_explanation) kastedilen, bahsedilen iller coğrafi olarak %100 BİREBİR AYNI olmalıdır!
+   - KESİNLİKLE plaka numarası başka bir il (örn: 6-Ankara, 34-İstanbul) iken, soruda ve çözümde başka illeri (örn: Erzurum, Ardahan) kastederek saçma sapan açıklamalar yazma!
+   - Erzurum ve Kars'ı sormak istiyorsan, plaka kodları KESİNLİKLE [25, 36] olmalıdır. Ankara ve İstanbul'u sormak istiyorsan plaka kodları KESİNLİKLE [6, 34] olmalıdır.
+   - Soru kökünde, seçeneklerde veya çözümde kastedilen her bir ilin Türkiye plaka numarasını aklında doğru eşleştir ve "highlighted_province_ids" dizisini kusursuz bir doğrulukla doldur. Bu kuralın ihlali kesinlikle kabul edilemez bir coğrafi hatadır!
 `;
 
   const systemPrompt = (pdfBase64 || pdfUri)
@@ -611,7 +615,11 @@ export async function generateSimilarQuestion(
   const systemPrompt = `Sen KPSS alanında uzman, efsanevi bir soru hazırlayıcısın.
 Görevin, sana verilen temel soruyla AYNI mikro kavramı (alt başlığı) ölçen, ancak tamamen farklı bir kurgu, farklı seçenekler ve farklı bir soru köküne sahip yepyeni benzersiz benzer bir soru oluşturmaktır.
 Soru, KPSS standartlarında, zor ve seçici olmalıdır. 5 şıklı olmalıdır (A, B, C, D, E).
-Cevap seçenekleri ve detaylı çözüm analizi (rational_explanation) mutlaka olmalıdır.`;
+Cevap seçenekleri ve detaylı çözüm analizi (rational_explanation) mutlaka olmalıdır.
+
+ÇOK KRİTİK GEREKLİLİK (HARİTALI SORULARDA COĞRAFİ UYUMLULUK VE KURAL):
+Eğer haritalı soru üretiyorsan, "highlighted_province_ids" dizisine eklediğin plaka kodları (1-81 arası) ile soru kökündeki ve çözümdeki iller coğrafi olarak %100 BİREBİR AYNI olmalıdır!
+Asla plaka kodları başka bir il (örn: 6-Ankara, 34-İstanbul) iken, soruda ve çözümde başka illeri (örn: Erzurum, Ardahan) kastedip saçma sapan "haritada aslında bu kastedilmiştir" gibi açıklamalar yazma. Plaka kodları ile sorulan iller birebir uyuşmalıdır.`;
 
   const userPrompt = `Aşağıdaki temel soruyla AYNI alt konuyu/kavramı ölçen benzer bir soru hazırla:
 Alt Başlık: ${baseQuestion.subtopic || 'KPSS Kavramı'}
