@@ -713,21 +713,23 @@ export async function generateSmartIndexSummary(
 
   const systemPrompt = `Sen KPSS hazırlık alanında efsaneleşmiş, milyonlarca öğrenciye Türkiye derecesi yaptırmış uzman bir KPSS hocasısın.
 Görevin, sana verilen kavramla ilgili, KPSS sınavında %100 karşılarına çıkabilecek en kritik, en kıyıda köşede kalmış akademik ve ÖSYM tarzı detayları içeren, son derece pratik ve akılda kalıcı bir çalışma özeti (Cheat Sheet / Ders Notu) hazırlamaktır.
-Markdown formatını çok şık ve temiz bir şekilde kullan. Önemli yerleri kalın yaz, tablolar ve maddeler kullanarak görsel ezberi kolaylaştır.`;
+Markdown formatını çok şık ve temiz bir şekilde kullan. Önemli yerleri kalın yaz, tablolar ve maddeler kullanarak görsel ezberi kolaylaştır.
+
+KRİTİK TALİMAT: KESİNLİKLE "Merhaba şampiyon", "Hoş geldin", "Kemerleri bağla", "Başarılar dilerim" gibi selamlama, giriş, sohbet veya kapanış cümleleri yazma! Token israfı ve gereksiz laf kalabalığı KESİNLİKLE YASAKTIR. Doğrudan ve sadece şablonun ilk başlığı (# 👑 ...) ile başlayıp içeriği üret ve son madde bittiğinde çıktıyı bitir.`;
 
   const userPrompt = `Lütfen "${concept}" kavramı ile ilgili, KPSS sınav müfredatına tam uyumlu efsanevi bir hızlı tekrar notu oluştur.
 Kategori: ${category === 'tarih' ? 'KPSS Tarih (Islahatlar, Savaşlar, Teşkilat, Padişah Dönemi vb.)' : 'KPSS Coğrafya (Maden Yatakları, Sanayi Tesisleri, Ulaşım vb.)'}
 
 Eğer sana yüklediğim PDF notları varsa, öncelikle o PDF'teki bilgileri tara ve süzgeçten geçir. PDF'te bu kavramla ilgili yer alan detayları asla atlama.
 
-Markdown başlık yapısı şöyle olsun:
+Markdown başlık yapısı şöyle olsun (Giriş yapmadan direkt bu başlıkla başla):
 # 👑 ${concept} - KPSS Akıllı Tekrar Notu
 ## 📌 En Kritik KPSS Bilgileri (Çıkmış ve Çıkabilecek Sorular)
 ... (Buraya efsanevi, tablolu ve maddeli KPSS ders notu gelecek)
 ## 💡 Altın Ezber Tüyoları & Şifreler (Hocanın Notu)
 ... (Buraya akılda kalıcı şifreler, kodlamalar veya tuzak sorulara karşı uyarılar gelecek)
 
-Notun tamamı Türkçe, son derece akıcı, samimi ve akademik olarak %100 hatasız olmalıdır.`;
+Notun tamamı Türkçe, son derece akıcı, net, sınav odaklı ve akademik olarak %100 hatasız olmalıdır.`;
 
   const parts: any[] = [];
   if (pdfUri) {

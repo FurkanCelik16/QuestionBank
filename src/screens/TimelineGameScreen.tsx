@@ -267,6 +267,16 @@ export const TimelineGameScreen: React.FC = () => {
   };
 
   const renderFormattedAIDetails = (text: string) => {
+    // Helper to render spaced paragraphs with 14px vertical gap
+    const renderParagraphs = (pText: string, textStyle: any) => {
+      const paragraphs = pText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+      return paragraphs.map((para, pIdx) => (
+        <Text key={pIdx} style={[textStyle, { marginBottom: 14 }]}>
+          {para}
+        </Text>
+      ));
+    };
+
     // Split text by "##" to isolate sections
     const sections = text.split(/(?=##)/g);
     
@@ -299,7 +309,7 @@ export const TimelineGameScreen: React.FC = () => {
         return (
           <View key={idx} style={s.tipBox}>
             <Text style={s.tipHeader}>{icon} {title}</Text>
-            <Text style={s.tipText}>{bodyLines}</Text>
+            {renderParagraphs(bodyLines, s.tipText)}
           </View>
         );
       }
@@ -307,7 +317,7 @@ export const TimelineGameScreen: React.FC = () => {
       return (
         <View key={idx} style={s.sectionCard}>
           <Text style={s.sectionCardHeader}>{icon} {title}</Text>
-          <Text style={s.sectionCardBody}>{bodyLines}</Text>
+          {renderParagraphs(bodyLines, s.sectionCardBody)}
         </View>
       );
     });
