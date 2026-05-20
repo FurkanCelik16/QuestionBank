@@ -14,6 +14,7 @@ import { HistoryScreen } from '../screens/HistoryScreen';
 import { MapQuizHomeScreen } from '../screens/MapQuizHomeScreen';
 import { MapQuizScreen } from '../screens/MapQuizScreen';
 import { MapQuizResultScreen } from '../screens/MapQuizResultScreen';
+import { MistakeResolverScreen } from '../screens/MistakeResolverScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -126,6 +127,14 @@ export const AppNavigator: React.FC = () => {
             <Stack.Screen
               name="MapQuizResult"
               component={MapQuizResultScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="MistakeResolver"
+              component={MistakeResolverScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: false,

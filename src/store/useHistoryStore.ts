@@ -8,19 +8,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TestHistoryItem } from '../types';
 
 const HISTORY_STORAGE_KEY = '@kpss_gemini_history';
+const SOLVED_WRONGS_KEY = '@kpss_gemini_solved_wrongs';
 
 interface HistoryState {
   history: TestHistoryItem[];
+  solvedWrongIds: number[];
   isLoaded: boolean;
 
   // Actions
   addTestResult: (item: TestHistoryItem) => Promise<void>;
   clearHistory: () => Promise<void>;
   loadHistory: () => Promise<void>;
+  markWrongAsSolved: (questionId: number) => Promise<void>;
 }
 
 export const useHistoryStore = create<HistoryState>((set, get) => ({
   history: [],
+  solvedWrongIds: [],
   isLoaded: false,
 
   addTestResult: async (item: TestHistoryItem) => {
@@ -37,7 +41,8 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   clearHistory: async () => {
     try {
       await AsyncStorage.removeItem(HISTORY_STORAGE_KEY);
-      set({ history: [] });
+      await AsyncStorage.removeItem(SOLVED_WRONGS_KEY);
+      set({ history: [], solvedWrongIds: [] });
     } catch (error) {
       console.error('Test geçmişi silme hatası:', error);
     }
@@ -46,15 +51,30 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   loadHistory: async () => {
     try {
       const stored = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
+      const solvedStored = await AsyncStorage.getItem(SOLVED_WRONGS_KEY);
+      const solvedWrongIds = solvedStored ? JSON.parse(solvedStored) : [];
       if (stored) {
         const history = JSON.parse(stored);
-        set({ history, isLoaded: true });
+        set({ history, solvedWrongIds, isLoaded: true });
       } else {
-        set({ history: [], isLoaded: true });
+        set({ history: [], solvedWrongIds, isLoaded: true });
       }
     } catch (error) {
       console.error('Test geçmişi yükleme hatası:', error);
       set({ isLoaded: true });
+    }
+  },
+
+  markWrongAsSolved: async (questionId: number) => {
+    try {
+      const currentSolved = get().solvedWrongIds;
+      if (!currentSolved.includes(questionId)) {
+        const updated = [...currentSolved, questionId];
+        await AsyncStorage.setItem(SOLVED_WRONGS_KEY, JSON.stringify(updated));
+        set({ solvedWrongIds: updated });
+      }
+    } catch (error) {
+      console.error('Yanlış soruyu çözüldü olarak işaretleme hatası:', error);
     }
   },
 }));

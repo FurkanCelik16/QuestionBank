@@ -82,4 +82,5 @@ export type RootStackParamList = {
   MapQuizHome: undefined;
   MapQuiz: undefined;
   MapQuizResult: undefined;
+  MistakeResolver: undefined;
 };

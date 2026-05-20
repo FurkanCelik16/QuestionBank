@@ -27,7 +27,16 @@ type Props = {
 
 export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
   const colors = useTheme();
-  const { history } = useHistoryStore();
+  const { history, solvedWrongIds } = useHistoryStore();
+
+  const wrongQuestionsCount = history.reduce<number[]>((acc, curr) => {
+    curr.result.wrongAnswers.forEach(wa => {
+      if (!acc.includes(wa.question.id) && !solvedWrongIds.includes(wa.question.id)) {
+        acc.push(wa.question.id);
+      }
+    });
+    return acc;
+  }, []).length;
 
   const totalTests = history.length;
   const totalQuestions = history.reduce((acc, curr) => acc + curr.result.totalQuestions, 0);
@@ -107,6 +116,21 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Hata Defteri Button */}
+      <TouchableOpacity
+        style={[s.mistakeBtn, wrongQuestionsCount === 0 && s.mistakeBtnDisabled]}
+        onPress={() => wrongQuestionsCount > 0 && navigation.navigate('MistakeResolver')}
+        activeOpacity={0.8}
+        disabled={wrongQuestionsCount === 0}
+      >
+        <Text style={s.mistakeBtnText}>📓 Hata Defterini Çöz</Text>
+        <View style={[s.mistakeBadge, { backgroundColor: wrongQuestionsCount === 0 ? colors.surfaceHighlight : colors.warningGlow }]}>
+          <Text style={[s.mistakeBadgeText, { color: wrongQuestionsCount > 0 ? colors.warning : colors.success }]}>
+            {wrongQuestionsCount > 0 ? `${wrongQuestionsCount} Yanlış sorunuz var` : 'Temiz ✓'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <Text style={s.listTitle}>Geçmiş Testler ({totalTests})</Text>
 
       {totalTests === 0 ? (
@@ -132,6 +156,37 @@ const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.xxl, paddingTop: spacing.md, paddingBottom: spacing.lg },
   headerTitle: { color: colors.textPrimary, fontSize: fontSize.xxl, fontWeight: '800' },
+  mistakeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.xxl,
+    backgroundColor: colors.surface,
+    borderColor: colors.warning,
+    borderWidth: 1.5,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  mistakeBtnDisabled: {
+    borderColor: colors.border,
+    opacity: 0.8,
+  },
+  mistakeBtnText: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  mistakeBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  mistakeBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+  },
   overviewCard: {
     marginHorizontal: spacing.xxl,
     backgroundColor: colors.surface,
