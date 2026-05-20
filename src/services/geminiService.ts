@@ -494,22 +494,10 @@ export async function uploadToGeminiFiles(
 
   const mimeType = 'application/pdf';
 
-  // 1. Convert base64 to binary byte array for upload first to get the exact byte size
-  let binaryString: string;
-  if (typeof atob === 'function') {
-    binaryString = atob(base64);
-  } else if (typeof Buffer !== 'undefined') {
-    binaryString = Buffer.from(base64, 'base64').toString('binary');
-  } else {
-    throw new Error('Base64 dönüştürücü bulunamadı.');
-  }
-
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
-  const fileLength = bytes.length;
+  // 1. Convert base64 to native Blob using native fetch (robust on Android, iOS, and Web)
+  const blobRes = await fetch(`data:${mimeType};base64,${base64}`);
+  const blob = await blobRes.blob();
+  const fileLength = blob.size;
 
   // 2. Start resumable upload session
   const initUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
@@ -539,15 +527,14 @@ export async function uploadToGeminiFiles(
     throw new Error('Google Dosya Servisi yükleme adresi (x-goog-upload-url) döndürmedi.');
   }
 
-  // 3. Perform the binary upload
+  // 3. Perform the binary upload with native Blob (removing the restricted Content-Length header)
   const uploadRes = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
-      'Content-Length': fileLength.toString(),
       'X-Goog-Upload-Offset': '0',
       'X-Goog-Upload-Command': 'upload, finalize',
     },
-    body: bytes,
+    body: blob,
   });
 
   if (!uploadRes.ok) {

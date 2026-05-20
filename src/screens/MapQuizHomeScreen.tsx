@@ -36,30 +36,8 @@ export const MapQuizHomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
       <View style={s.content}>
-        <Text style={s.title}>Harita Tahmin</Text>
-        <Text style={s.subtitle}>Coğrafi bilgini test et</Text>
-
-        <View style={s.modeSection}>
-          <TouchableOpacity 
-            style={[s.modeCard, mode === 'turkey' && s.modeCardActive]}
-            onPress={() => setMode('turkey')}
-            activeOpacity={0.8}
-          >
-            <Text style={s.modeEmoji}>🇹🇷</Text>
-            <Text style={[s.modeTitle, mode === 'turkey' && s.modeTitleActive]}>Türkiye Haritası</Text>
-            <Text style={s.modeDesc}>81 ili tahmin et</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[s.modeCard, mode === 'world' && s.modeCardActive]}
-            onPress={() => setMode('world')}
-            activeOpacity={0.8}
-          >
-            <Text style={s.modeEmoji}>🌍</Text>
-            <Text style={[s.modeTitle, mode === 'world' && s.modeTitleActive]}>Dünya Haritası</Text>
-            <Text style={s.modeDesc}>Popüler ülkeleri tahmin et</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={s.title}>Türkiye Harita Tahmin</Text>
+        <Text style={s.subtitle}>Türkiye'nin 81 ilini tahmin ederek coğrafi bilgini test et!</Text>
 
         <View style={s.optionsSection}>
           <Text style={s.optionsTitle}>Soru Sayısı</Text>

@@ -1,5 +1,4 @@
-import { provinces, getTurkeyDistractors, Province } from '../data/turkeyProvinces';
-import { worldCountries, getWorldDistractors, Country } from '../data/worldCountries';
+import { provinces, getTurkeyDistractors } from '../data/turkeyProvinces';
 
 export interface MapQuizQuestion {
   id: number;
@@ -14,7 +13,7 @@ export interface MapQuizQuestion {
   correct_answer: 'A' | 'B' | 'C' | 'D';
 }
 
-export type MapQuizMode = 'turkey' | 'world';
+export type MapQuizMode = 'turkey';
 
 /**
  * Shuffle array in place using Fisher-Yates algorithm
@@ -31,59 +30,31 @@ function shuffleArray<T>(array: T[]): T[] {
 export function generateMapQuiz(mode: MapQuizMode, count: number): MapQuizQuestion[] {
   const questions: MapQuizQuestion[] = [];
   
-  if (mode === 'turkey') {
-    // Rastgele 'count' kadar il seç (tekrarsız)
-    const shuffledProvinces = shuffleArray(provinces);
-    const selectedProvinces = shuffledProvinces.slice(0, count);
+  // Rastgele 'count' kadar il seç (tekrarsız)
+  const shuffledProvinces = shuffleArray(provinces);
+  const selectedProvinces = shuffledProvinces.slice(0, count);
 
-    selectedProvinces.forEach((target, index) => {
-      const distractors = getTurkeyDistractors(target.id, 3);
-      const allOptions = [target.name, ...distractors.map(d => d.name)];
-      const shuffledOptions = shuffleArray(allOptions);
-      
-      const correctIndex = shuffledOptions.indexOf(target.name);
-      const keys: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
+  selectedProvinces.forEach((target, index) => {
+    const distractors = getTurkeyDistractors(target.id, 3);
+    const allOptions = [target.name, ...distractors.map(d => d.name)];
+    const shuffledOptions = shuffleArray(allOptions);
+    
+    const correctIndex = shuffledOptions.indexOf(target.name);
+    const keys: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
 
-      questions.push({
-        id: index + 1,
-        targetId: target.id,
-        targetName: target.name,
-        options: {
-          A: shuffledOptions[0],
-          B: shuffledOptions[1],
-          C: shuffledOptions[2],
-          D: shuffledOptions[3],
-        },
-        correct_answer: keys[correctIndex],
-      });
+    questions.push({
+      id: index + 1,
+      targetId: target.id,
+      targetName: target.name,
+      options: {
+        A: shuffledOptions[0],
+        B: shuffledOptions[1],
+        C: shuffledOptions[2],
+        D: shuffledOptions[3],
+      },
+      correct_answer: keys[correctIndex],
     });
-  } else {
-    // Rastgele 'count' kadar ülke seç (tekrarsız)
-    const shuffledCountries = shuffleArray(worldCountries);
-    const selectedCountries = shuffledCountries.slice(0, count);
-
-    selectedCountries.forEach((target, index) => {
-      const distractors = getWorldDistractors(target.id, 3);
-      const allOptions = [target.name, ...distractors.map(d => d.name)];
-      const shuffledOptions = shuffleArray(allOptions);
-      
-      const correctIndex = shuffledOptions.indexOf(target.name);
-      const keys: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
-
-      questions.push({
-        id: index + 1,
-        targetId: target.id,
-        targetName: target.name,
-        options: {
-          A: shuffledOptions[0],
-          B: shuffledOptions[1],
-          C: shuffledOptions[2],
-          D: shuffledOptions[3],
-        },
-        correct_answer: keys[correctIndex],
-      });
-    });
-  }
+  });
 
   return questions;
 }
