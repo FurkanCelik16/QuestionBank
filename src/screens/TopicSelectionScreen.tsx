@@ -210,7 +210,11 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
             category={t.category} 
           />
         ))}
-            <View style={s.pdfHeader}>
+      </ScrollView>
+
+      <View style={s.bottom}>
+        <View style={s.qcSection}>
+          <View style={s.pdfHeader}>
             <Text style={s.qcLabel}>Kaynak Doküman Kütüphanesi (En Fazla 3 Adet)</Text>
             {pdfUri && (
               <TouchableOpacity onPress={() => selectPdfSlot(null)}>
@@ -302,9 +306,8 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
               />
             </View>
           )}
-      </ScrollView>
-      
-      <View style={s.bottom}>
+        </View>
+
         <View style={s.qcSection}>
           <Text style={s.qcLabel}>Soru Sayısı</Text>
           <View style={s.qcRow}>
