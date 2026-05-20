@@ -292,20 +292,6 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           {pdfUri && <Text style={s.pdfHint}>* Sorular öncelikle seçili olan aktif PDF'teki bilgilere göre hazırlanacaktır.</Text>}
-          {pdfUri && (
-            <View style={s.pageRangeContainer}>
-              <Text style={s.pageRangeLabel}>🎯 Sayfa Aralığı Sınırla (Opsiyonel)</Text>
-              <TextInput
-                style={s.pageRangeInput}
-                placeholder="Örn: 45-60 (Boş bırakırsanız tümü taranır)"
-                placeholderTextColor={colors.textSecondary}
-                value={pdfPageRange || ''}
-                onChangeText={(val) => setPdfPageRange(val || null)}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          )}
         </View>
 
         <View style={s.qcSection}>
@@ -353,10 +339,10 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
 
 const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.md },
+  header: { paddingHorizontal: spacing.xxl, paddingTop: spacing.xs, paddingBottom: spacing.xs },
   headerTitle: { color: colors.textPrimary, fontSize: fontSize.xxxl, fontWeight: '800' },
   headerSub: { color: colors.textSecondary, fontSize: fontSize.md, marginTop: spacing.xs },
-  tabRow: { flexDirection: 'row', marginHorizontal: spacing.xxl, marginBottom: spacing.md, gap: spacing.sm },
+  tabRow: { flexDirection: 'row', marginHorizontal: spacing.xxl, marginBottom: spacing.xs, gap: spacing.sm },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderRadius: borderRadius.md, paddingVertical: spacing.md, borderWidth: 1.5, borderColor: colors.border, gap: spacing.xs },
   tabActTarih: { borderColor: colors.tarih, backgroundColor: colors.tarihGlow },
   tabActCog: { borderColor: colors.cografya, backgroundColor: colors.cografyaGlow },
@@ -370,8 +356,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   selAllText: { color: colors.accent, fontSize: fontSize.sm, fontWeight: '600' },
   list: { flex: 1, paddingHorizontal: spacing.xxl },
   listContent: { paddingBottom: spacing.md },
-  bottom: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
-  qcSection: { marginBottom: spacing.lg },
+  bottom: { paddingHorizontal: spacing.xxl, paddingTop: spacing.md, paddingBottom: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  qcSection: { marginBottom: spacing.md },
   qcLabel: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   qcRow: { flexDirection: 'row', gap: spacing.sm },
   qcBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surfaceLight, borderWidth: 1.5, borderColor: colors.border },
@@ -380,7 +366,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   qcBtnTextAct: { color: colors.primary },
   diffText: { color: colors.textSecondary, fontSize: 14 },
   diffLabel: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: '600' },
-  startBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center' },
+  startBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.md, alignItems: 'center' },
   startBtnDis: { backgroundColor: colors.surfaceHighlight },
   startBtnText: { color: colors.textInverse, fontSize: fontSize.lg, fontWeight: '700' },
   startBtnTextDis: { color: colors.textMuted },
