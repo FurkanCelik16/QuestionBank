@@ -202,7 +202,7 @@ export const TimelineGameScreen: React.FC = () => {
     try {
       const details = await generateTimelineEventDetail(event.title, event.year, apiKey);
       const cleanDetails = details
-        .replace(/[\#\*\_]/g, '')
+        .replace(/[\*\_]/g, '') // Keep # so we can parse headings correctly!
         .replace(/\n\s*\n/g, '\n\n')
         .trim();
       setAiDetails(cleanDetails);
@@ -764,8 +764,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
-  modalYearText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '800' },
-  modalTitleText: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '800', marginTop: 2 },
+  modalYearText: { color: colors.primary, fontSize: 15, fontWeight: '800' },
+  modalTitleText: { color: colors.textPrimary, fontSize: 18, fontWeight: '800', marginTop: 2 },
   closeBtn: {
     backgroundColor: colors.surfaceHighlight,
     paddingHorizontal: spacing.md,
@@ -780,39 +780,53 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   sectionCard: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.sm
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    marginBottom: spacing.md
   },
   sectionCardHeader: {
-    color: colors.textPrimary,
-    fontSize: fontSize.sm,
+    color: colors.primary,
+    fontSize: 16,
     fontWeight: '800',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 6,
-    marginBottom: 8
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.primary + '25',
+    paddingBottom: 8,
+    marginBottom: 10
   },
   sectionCardBody: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    lineHeight: 22
+    color: colors.textPrimary,
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: '500'
   },
 
   tipBox: {
     backgroundColor: colors.primaryGlow,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary + '30',
-    padding: spacing.lg,
-    marginBottom: spacing.sm
+    borderRadius: borderRadius.xl,
+    borderWidth: 1.5,
+    borderColor: colors.primary + '40',
+    padding: spacing.xl,
+    marginBottom: spacing.md
   },
-  tipHeader: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '800', marginBottom: 6 },
-  tipText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22 },
+  tipHeader: { 
+    color: colors.primary, 
+    fontSize: 16, 
+    fontWeight: '800', 
+    marginBottom: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.primary + '25',
+    paddingBottom: 8
+  },
+  tipText: { 
+    color: colors.textPrimary, 
+    fontSize: 15, 
+    lineHeight: 24,
+    fontWeight: '500'
+  },
   loaderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
   loaderText: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700', marginTop: spacing.lg, textAlign: 'center' },
   loaderSubText: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 4, textAlign: 'center' },
-  aiBodyText: { color: colors.textPrimary, fontSize: fontSize.sm, lineHeight: 24 }
+  aiBodyText: { color: colors.textPrimary, fontSize: 15, lineHeight: 24 }
 });
