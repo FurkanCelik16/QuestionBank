@@ -452,7 +452,7 @@ Her soruda "subtopic" alanı olsun.`;
         question.correct_answer = 'A';
       }
 
-      return question;
+      return cleanQuestionPlakas(question);
     });
 
     // Ensure unique IDs
@@ -729,7 +729,8 @@ Lütfen JSON formatında ve tam olarak şu şemaya uygun bir nesne dön:
     throw new Error('Yapay zeka geçerli bir soru döndüremedi.');
   }
 
-  return JSON.parse(textResponse) as QuizQuestion;
+  const similarQuestion = JSON.parse(textResponse) as QuizQuestion;
+  return cleanQuestionPlakas(similarQuestion);
 }
 
 /**
@@ -879,4 +880,32 @@ Notun tamamı Türkçe, son derece akıcı, net, nokta atışı bilgi odaklı ve
   }
 
   return textResponse;
+}
+
+/**
+ * Programmatically strips raw bracketed plaka codes (e.g. "[25]", "[25] numaralı il olan")
+ * from question texts, options, and explanations to act as an unbreakable programmatic safety net.
+ */
+export function cleanPlakaFromText(text: string): string {
+  if (!text) return '';
+  let cleaned = text.replace(/\[\d+\]\s*numaralı\s*il(?:imiz| olan)?\s*/gi, '');
+  cleaned = cleaned.replace(/\[\d+\]\s*numaralı\s*/gi, '');
+  cleaned = cleaned.replace(/\s*\(\s*\[\d+\]\s*\)/gi, '');
+  cleaned = cleaned.replace(/\[\d+\]/gi, '');
+  return cleaned;
+}
+
+export function cleanQuestionPlakas(q: QuizQuestion): QuizQuestion {
+  return {
+    ...q,
+    question_text: cleanPlakaFromText(q.question_text),
+    options: {
+      A: cleanPlakaFromText(q.options.A),
+      B: cleanPlakaFromText(q.options.B),
+      C: cleanPlakaFromText(q.options.C),
+      D: cleanPlakaFromText(q.options.D),
+      E: cleanPlakaFromText(q.options.E),
+    },
+    rational_explanation: cleanPlakaFromText(q.rational_explanation),
+  };
 }
