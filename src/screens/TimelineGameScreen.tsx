@@ -12,6 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { generateTimelineEventDetail } from '../services/geminiService';
+import { ActivityIndicator } from 'react-native';
 
 interface TimelineEvent {
   id: string;
@@ -126,6 +129,33 @@ export const TimelineGameScreen: React.FC = () => {
 
   // Modal / Detail state
   const [selectedDetailEvent, setSelectedDetailEvent] = useState<TimelineEvent | null>(null);
+  const [aiDetails, setAiDetails] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
+
+  const handleOpenDetails = async (event: TimelineEvent) => {
+    setSelectedDetailEvent(event);
+    setAiDetails(null);
+    setLoadingDetails(true);
+
+    const apiKey = useSettingsStore.getState().apiKey;
+    if (!apiKey) {
+      setLoadingDetails(false);
+      return;
+    }
+
+    try {
+      const details = await generateTimelineEventDetail(event.title, event.year, apiKey);
+      const cleanDetails = details
+        .replace(/[\#\*\_]/g, '')
+        .replace(/\n\s*\n/g, '\n\n')
+        .trim();
+      setAiDetails(cleanDetails);
+    } catch (err: any) {
+      console.warn("AI details generation failed, using local details:", err.message);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   // Game specific state with dynamic random subset
   const [gameShuffledEvents, setGameShuffledEvents] = useState<TimelineEvent[]>([]);
@@ -251,7 +281,7 @@ export const TimelineGameScreen: React.FC = () => {
               <TouchableOpacity
                 key={event.id}
                 style={s.timelineNodeRow}
-                onPress={() => setSelectedDetailEvent(event)}
+                onPress={() => handleOpenDetails(event)}
                 activeOpacity={0.8}
               >
                 {/* Node circle on the line */}
@@ -315,7 +345,7 @@ export const TimelineGameScreen: React.FC = () => {
                   {/* Detay Info Button */}
                   <TouchableOpacity
                     style={s.gameCardInfoBtn}
-                    onPress={() => setSelectedDetailEvent(event)}
+                    onPress={() => handleOpenDetails(event)}
                     activeOpacity={0.7}
                   >
                     <Text style={s.gameCardInfoText}>ℹ️ Detay</Text>
@@ -390,15 +420,27 @@ export const TimelineGameScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.modalContent}>
-              <Text style={s.sectionHeader}>📋 Tarihsel Olay Özeti</Text>
-              <Text style={s.bodyText}>{selectedDetailEvent?.desc}</Text>
-
-              <View style={s.tipBox}>
-                <Text style={s.tipHeader}>💡 ÖSYM KPSS Püf Noktaları (Tuzaklar)</Text>
-                <Text style={s.tipText}>{selectedDetailEvent?.kpssTip}</Text>
+            {loadingDetails ? (
+              <View style={s.loaderContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={s.loaderText}>Yapay Zeka Derin KPSS Analizi Yapıyor...</Text>
+                <Text style={s.loaderSubText}>Konu ve döneme özel nokta atışı ÖSYM tüyoları derleniyor.</Text>
               </View>
-            </ScrollView>
+            ) : aiDetails ? (
+              <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.modalContent}>
+                <Text style={s.aiBodyText}>{aiDetails}</Text>
+              </ScrollView>
+            ) : (
+              <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.modalContent}>
+                <Text style={s.sectionHeader}>📋 Tarihsel Olay Özeti</Text>
+                <Text style={s.bodyText}>{selectedDetailEvent?.desc}</Text>
+
+                <View style={s.tipBox}>
+                  <Text style={s.tipHeader}>💡 ÖSYM KPSS Püf Noktaları (Tuzaklar)</Text>
+                  <Text style={s.tipText}>{selectedDetailEvent?.kpssTip}</Text>
+                </View>
+              </ScrollView>
+            )}
           </SafeAreaView>
         </View>
       </Modal>
@@ -641,5 +683,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginTop: spacing.md
   },
   tipHeader: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '800', marginBottom: 6 },
-  tipText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22 }
+  tipText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22 },
+  loaderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
+  loaderText: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700', marginTop: spacing.lg, textAlign: 'center' },
+  loaderSubText: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 4, textAlign: 'center' },
+  aiBodyText: { color: colors.textPrimary, fontSize: fontSize.sm, lineHeight: 24 }
 });
