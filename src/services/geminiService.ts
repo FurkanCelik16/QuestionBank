@@ -45,6 +45,66 @@ export const KPSS_SYLLABUS: Record<string, string> = {
 };
 
 /**
+ * Executes a Gemini content generation request with automatic model fallbacks if
+ * the user's preferred model is down, rate-limited, or unavailable (e.g. status 503).
+ */
+async function fetchGeminiWithFallback(
+  preferredModel: string,
+  requestBody: any,
+  apiKey: string,
+  responseMimeType?: string
+): Promise<any> {
+  const modelsToTry = [preferredModel, 'gemini-1.5-flash', 'gemini-2.5-flash'];
+  const uniqueModels = Array.from(new Set(modelsToTry.filter(Boolean)));
+  
+  let lastError: any = null;
+  
+  for (const model of uniqueModels) {
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    
+    // Copy the requestBody so we don't mutate the original
+    const bodyCopy = JSON.parse(JSON.stringify(requestBody));
+    
+    if (responseMimeType) {
+      bodyCopy.generationConfig = bodyCopy.generationConfig || {};
+      bodyCopy.generationConfig.responseMimeType = responseMimeType;
+    }
+    
+    try {
+      console.log(`Gemini API çağrılıyor. Model: ${model}`);
+      const res = await fetch(`${geminiUrl}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyCopy),
+      });
+      
+      if (res.ok) {
+        return await res.json();
+      }
+      
+      const errorData = await res.json().catch(() => null);
+      const message = errorData?.error?.message || `HTTP ${res.status}`;
+      console.warn(`Model ${model} hatası: ${message} (Status: ${res.status})`);
+      
+      lastError = new Error(message);
+      
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('API anahtarı geçersiz veya yetkisiz. Lütfen anahtarınızı kontrol edin.');
+      }
+      
+    } catch (err: any) {
+      console.warn(`Model ${model} çağrılırken istisna oluştu:`, err.message);
+      lastError = err;
+      if (err.message.includes('API anahtarı geçersiz')) {
+        throw err;
+      }
+    }
+  }
+  
+  throw lastError || new Error('Gemini API bağlantı hatası.');
+}
+
+/**
  * Generates a quiz using Gemini API based on selected topics, question count, difficulty, and optional PDF.
  */
 export async function generateQuiz(
@@ -619,17 +679,13 @@ Lütfen JSON formatında ve tam olarak şu şemaya uygun bir nesne dön:
     },
   };
 
-  const response = await fetch(`${geminiUrl}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
+  const resultData = await fetchGeminiWithFallback(
+    modelName,
+    requestBody,
+    apiKey,
+    'application/json'
+  );
 
-  if (!response.ok) {
-    throw new Error('Gemini API benzer soru oluşturma hatası: ' + response.statusText);
-  }
-
-  const resultData = await response.json();
   const textResponse = resultData?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!textResponse) {
     throw new Error('Yapay zeka geçerli bir soru döndüremedi.');
@@ -708,17 +764,12 @@ Notun tamamı Türkçe, son derece akıcı, samimi ve akademik olarak %100 hatas
     },
   };
 
-  const response = await fetch(`${geminiUrl}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
+  const resultData = await fetchGeminiWithFallback(
+    modelName,
+    requestBody,
+    apiKey
+  );
 
-  if (!response.ok) {
-    throw new Error('Gemini API özet oluşturma hatası: ' + response.statusText);
-  }
-
-  const resultData = await response.json();
   const textResponse = resultData?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!textResponse) {
     throw new Error('Yapay zeka geçerli bir ders notu oluşturamadı.');
