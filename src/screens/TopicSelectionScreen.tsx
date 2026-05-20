@@ -34,7 +34,8 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
     selectedTopics, questionCount, difficulty, 
     setSelectedTopics, setQuestionCount, setDifficulty,
     pdfUri, pdfName, setPdfContext, clearPdfContext,
-    pdfPageRange, setPdfPageRange, loadPdfContext
+    pdfPageRange, setPdfPageRange, loadPdfContext,
+    pdfSlots, selectedSlotId, selectPdfSlot, clearPdfSlot, uploadToPdfSlot
   } = useQuizStore();
   
   React.useEffect(() => {
@@ -64,7 +65,7 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
     setSelectedTopics(Array.from(nextSet));
   };
 
-  const pickDocument = async () => {
+  const pickDocument = async (slotId: string) => {
     if (!apiKey) {
       if (Platform.OS === 'web') {
         window.alert('Lütfen PDF yüklemeden önce Ayarlar (Settings) ekranından Gemini API anahtarınızı girin.');
@@ -112,7 +113,7 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
         // Upload directly to Gemini Files API
         const geminiUri = await uploadToGeminiFiles(base64, asset.name, apiKey, Platform.OS !== 'web' ? asset.uri : null);
 
-        setPdfContext(asset.uri, base64, asset.name, geminiUri);
+        uploadToPdfSlot(slotId, asset.uri, base64, asset.name, geminiUri);
 
         if (Platform.OS === 'web') {
           window.alert(`${asset.name} başarıyla Google Gemini bulut sunucusuna yüklendi! Sorularınız artık saniyeler içinde hazırlanacaktır.`);
@@ -209,36 +210,84 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
             category={t.category} 
           />
         ))}
-      </ScrollView>
-      
-      <View style={s.bottom}>
-        <View style={s.qcSection}>
-          <View style={s.pdfHeader}>
-            <Text style={s.qcLabel}>Kaynak Doküman (Opsiyonel)</Text>
+            <View style={s.pdfHeader}>
+            <Text style={s.qcLabel}>Kaynak Doküman Kütüphanesi (En Fazla 3 Adet)</Text>
             {pdfUri && (
-              <TouchableOpacity onPress={clearPdfContext}>
-                <Text style={s.clearPdf}>Kaldır</Text>
+              <TouchableOpacity onPress={() => selectPdfSlot(null)}>
+                <Text style={s.clearPdf}>Seçimi Kaldır</Text>
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity 
-            style={[s.pdfBtn, pdfUri && s.pdfBtnActive]} 
-            onPress={pickDocument}
-            disabled={isPicking}
-            activeOpacity={0.7}
-          >
-            {isPicking ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <>
-                <Text style={s.pdfEmoji}>{pdfUri ? '☁️' : '📁'}</Text>
-                <Text style={[s.pdfText, pdfUri && s.pdfTextActive]} numberOfLines={1}>
-                  {pdfUri ? `${pdfName} (Bulutta Hazır ⚡)` : 'PDF Notlarını Yükle (Detaylı sorular için)'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-          {pdfUri && <Text style={s.pdfHint}>* Sorular öncelikle bu PDF'teki bilgilere göre hazırlanacaktır.</Text>}
+
+          <View style={s.slotsRow}>
+            {['slot_1', 'slot_2', 'slot_3'].map((slotId, index) => {
+              const slot = pdfSlots[slotId];
+              const isSelected = selectedSlotId === slotId;
+
+              return (
+                <View key={slotId} style={s.slotWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      s.slotCard,
+                      isSelected && s.slotCardSelected,
+                      slot && s.slotCardFilled,
+                    ]}
+                    onPress={() => {
+                      if (slot) {
+                        selectPdfSlot(isSelected ? null : slotId);
+                      } else {
+                        pickDocument(slotId);
+                      }
+                    }}
+                    disabled={isPicking}
+                    activeOpacity={0.7}
+                  >
+                    {isPicking && !slot && selectedSlotId === slotId ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : slot ? (
+                      <>
+                        <Text style={s.slotEmoji}>📄</Text>
+                        <Text style={s.slotName} numberOfLines={2}>
+                          {slot.name}
+                        </Text>
+                        <View style={[s.slotBadge, isSelected && s.slotBadgeSelected]}>
+                          <Text style={[s.slotBadgeText, isSelected && { color: colors.background }]}>
+                            {isSelected ? 'Aktif' : 'Seç'}
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={s.slotEmptyEmoji}>➕</Text>
+                        <Text style={s.slotEmptyText}>Slot {index + 1}</Text>
+                        <Text style={s.slotAddSub}>Yükle</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  {slot && (
+                    <TouchableOpacity
+                      style={s.slotDeleteBtn}
+                      onPress={() => {
+                        Alert.alert(
+                          'Dokümanı Sil',
+                          `"${slot.name}" belgesini silmek istediğinize emin misiniz?`,
+                          [
+                            { text: 'Vazgeç', style: 'cancel' },
+                            { text: 'Sil', style: 'destructive', onPress: () => clearPdfSlot(slotId) },
+                          ]
+                        );
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.slotDeleteEmoji}>🗑️</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+
+          {pdfUri && <Text style={s.pdfHint}>* Sorular öncelikle seçili olan aktif PDF'teki bilgilere göre hazırlanacaktır.</Text>}
           {pdfUri && (
             <View style={s.pageRangeContainer}>
               <Text style={s.pageRangeLabel}>🎯 Sayfa Aralığı Sınırla (Opsiyonel)</Text>
@@ -253,8 +302,9 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
               />
             </View>
           )}
-        </View>
-
+      </ScrollView>
+      
+      <View style={s.bottom}>
         <View style={s.qcSection}>
           <Text style={s.qcLabel}>Soru Sayısı</Text>
           <View style={s.qcRow}>
@@ -343,4 +393,19 @@ const getStyles = (colors: any) => StyleSheet.create({
   pageRangeContainer: { marginTop: spacing.md, backgroundColor: colors.surfaceLight, borderRadius: borderRadius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   pageRangeLabel: { color: colors.textPrimary, fontSize: fontSize.xs, fontWeight: '700', marginBottom: spacing.xs },
   pageRangeInput: { height: 40, backgroundColor: colors.surface, borderRadius: borderRadius.sm, paddingHorizontal: spacing.md, color: colors.textPrimary, fontSize: fontSize.sm, borderWidth: 1, borderColor: colors.border },
+  slotsRow: { flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', marginBottom: spacing.xs },
+  slotWrapper: { flex: 1, position: 'relative' },
+  slotCard: { flex: 1, aspectRatio: 0.85, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceLight, borderRadius: borderRadius.md, borderWidth: 1.5, borderColor: colors.border, padding: spacing.sm },
+  slotCardSelected: { borderColor: colors.primary, backgroundColor: colors.primaryGlow },
+  slotCardFilled: { borderStyle: 'solid' },
+  slotEmoji: { fontSize: 24, marginBottom: spacing.xs },
+  slotName: { color: colors.textPrimary, fontSize: fontSize.xs, fontWeight: '600', textAlign: 'center', flex: 1, marginBottom: 4 },
+  slotBadge: { backgroundColor: colors.surface, borderRadius: borderRadius.full, paddingVertical: 2, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  slotBadgeSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  slotBadgeText: { color: colors.textSecondary, fontSize: 10, fontWeight: '700' },
+  slotEmptyEmoji: { fontSize: 20, color: colors.textSecondary, marginBottom: 2 },
+  slotEmptyText: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '700' },
+  slotAddSub: { color: colors.textSecondary, fontSize: 10, fontWeight: '500', marginTop: 2 },
+  slotDeleteBtn: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, elevation: 2 },
+  slotDeleteEmoji: { fontSize: 10 },
 });

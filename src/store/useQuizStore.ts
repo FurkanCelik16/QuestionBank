@@ -6,6 +6,13 @@ import { create } from 'zustand';
 import { QuizQuestion, QuizResult, DifficultyLevel } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export interface PersistedPdf {
+  uri: string;
+  base64: string;
+  name: string;
+  geminiFileUri: string;
+}
+
 interface QuizState {
   // Config
   selectedTopics: string[];
@@ -28,6 +35,10 @@ interface QuizState {
   geminiFileUri: string | null;
   pdfPageRange: string | null;
 
+  // 3-Slot PDF Library
+  pdfSlots: Record<string, PersistedPdf | null>;
+  selectedSlotId: string | null;
+
   // Actions
   setSelectedTopics: (topics: string[]) => void;
   setQuestionCount: (count: number) => void;
@@ -43,6 +54,9 @@ interface QuizState {
   clearPdfContext: () => void;
   setPdfPageRange: (range: string | null) => void;
   loadPdfContext: () => Promise<void>;
+  selectPdfSlot: (slotId: string | null) => void;
+  uploadToPdfSlot: (slotId: string, uri: string, base64: string, name: string, geminiUri: string) => void;
+  clearPdfSlot: (slotId: string) => void;
   resetQuiz: () => void;
   resetQuizKeepTopics: () => void;
 
@@ -68,6 +82,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   pdfName: null,
   geminiFileUri: null,
   pdfPageRange: null,
+  pdfSlots: { slot_1: null, slot_2: null, slot_3: null },
+  selectedSlotId: null,
 
   setSelectedTopics: (topics) => set({ selectedTopics: topics }),
   
@@ -167,22 +183,126 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   loadPdfContext: async () => {
     try {
-      const [uri, base64, name, geminiUri, range] = await Promise.all([
-        AsyncStorage.getItem('@kpss_pdf_uri'),
-        AsyncStorage.getItem('@kpss_pdf_base_64'),
-        AsyncStorage.getItem('@kpss_pdf_name'),
-        AsyncStorage.getItem('@kpss_gemini_file_uri'),
+      const [slotsJson, selectedId, range] = await Promise.all([
+        AsyncStorage.getItem('@kpss_pdf_slots'),
+        AsyncStorage.getItem('@kpss_selected_slot_id'),
         AsyncStorage.getItem('@kpss_pdf_page_range'),
       ]);
+
+      const pdfSlots = slotsJson 
+        ? JSON.parse(slotsJson) 
+        : { slot_1: null, slot_2: null, slot_3: null };
+      
+      const selectedSlotId = selectedId || null;
+      let activePdf: PersistedPdf | null = null;
+      if (selectedSlotId && pdfSlots[selectedSlotId]) {
+        activePdf = pdfSlots[selectedSlotId];
+      }
+
+      set({
+        pdfSlots,
+        selectedSlotId,
+        pdfPageRange: range,
+        pdfUri: activePdf ? activePdf.uri : null,
+        pdfBase64: activePdf ? activePdf.base64 : null,
+        pdfName: activePdf ? activePdf.name : null,
+        geminiFileUri: activePdf ? activePdf.geminiFileUri : null,
+      });
+    } catch (e) {
+      console.warn('Persisted PDF load error:', e);
+    }
+  },
+
+  selectPdfSlot: (slotId) => {
+    const { pdfSlots } = get();
+    const activePdf = slotId ? pdfSlots[slotId] : null;
+
+    set({
+      selectedSlotId: slotId,
+      pdfUri: activePdf ? activePdf.uri : null,
+      pdfBase64: activePdf ? activePdf.base64 : null,
+      pdfName: activePdf ? activePdf.name : null,
+      geminiFileUri: activePdf ? activePdf.geminiFileUri : null,
+    });
+
+    try {
+      if (slotId) {
+        AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
+      } else {
+        AsyncStorage.removeItem('@kpss_selected_slot_id');
+      }
+    } catch (e) {
+      console.warn('Persist selected slot error:', e);
+    }
+  },
+
+  uploadToPdfSlot: (slotId, uri, base64, name, geminiUri) => {
+    const { pdfSlots, selectedSlotId } = get();
+    const updatedSlots = {
+      ...pdfSlots,
+      [slotId]: { uri, base64, name, geminiFileUri: geminiUri }
+    };
+
+    const shouldSelect = !selectedSlotId;
+    const newSelectedSlotId = shouldSelect ? slotId : selectedSlotId;
+
+    set({
+      pdfSlots: updatedSlots,
+      selectedSlotId: newSelectedSlotId,
+    });
+
+    if (shouldSelect) {
       set({
         pdfUri: uri,
         pdfBase64: base64,
         pdfName: name,
         geminiFileUri: geminiUri,
-        pdfPageRange: range,
       });
+    }
+
+    try {
+      AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(updatedSlots));
+      if (shouldSelect) {
+        AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
+      }
     } catch (e) {
-      console.warn('Persisted PDF load error:', e);
+      console.warn('Persist upload slots error:', e);
+    }
+  },
+
+  clearPdfSlot: (slotId) => {
+    const { pdfSlots, selectedSlotId } = get();
+    const updatedSlots = {
+      ...pdfSlots,
+      [slotId]: null
+    };
+
+    const isCurrentSelected = selectedSlotId === slotId;
+    const newSelectedSlotId = isCurrentSelected ? null : selectedSlotId;
+
+    set({
+      pdfSlots: updatedSlots,
+      selectedSlotId: newSelectedSlotId,
+    });
+
+    if (isCurrentSelected) {
+      set({
+        pdfUri: null,
+        pdfBase64: null,
+        pdfName: null,
+        geminiFileUri: null,
+        pdfPageRange: null,
+      });
+    }
+
+    try {
+      AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(updatedSlots));
+      if (isCurrentSelected) {
+        AsyncStorage.removeItem('@kpss_selected_slot_id');
+        AsyncStorage.removeItem('@kpss_pdf_page_range');
+      }
+    } catch (e) {
+      console.warn('Persist clear slot error:', e);
     }
   },
 
