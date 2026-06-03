@@ -143,6 +143,12 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
       .filter(Boolean)
       .slice(0, 40); // Keep max 40 question texts to avoid bloating the prompt
 
+    console.log('[Diagnostic] History length:', history.length);
+    console.log('[Diagnostic] Recent question texts count:', recentQuestionTexts.length);
+    console.log('[Diagnostic] Recent question texts:', JSON.stringify(recentQuestionTexts, null, 2));
+    console.log('[Diagnostic] Asked questions (concepts) count:', askedQuestions.length);
+    console.log('[Diagnostic] Asked questions (concepts):', JSON.stringify(askedQuestions, null, 2));
+
     // Dynamically calculate the final page range based on selected topics if pdfPageRange is not manually provided
     let finalPageRange = pdfPageRange;
     if (!finalPageRange && selectedTopics.length > 0) {

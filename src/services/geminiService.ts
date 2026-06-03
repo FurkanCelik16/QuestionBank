@@ -184,6 +184,7 @@ ${excludeQuestionTexts.map((q, idx) => `${idx + 1}. "${q.trim()}"`).join('\n')}\
 2. Kesinlikle aynı sayfadan, aynı paragraftan veya aynı mikro kavramdan birden fazla soru üretme! Dokümanın geneline yayılarak geniş, zengin ve çeşitli bir bilgi kapsamı sağla.
 3. PDF dokümanının baş kısımlarında sıkışıp kalma; dokümanın orta ve son kısımlarındaki derin detayları, tablolardaki küçük bilgileri, dipnotları ve kritik ayrıntıları da taranarak benzersiz sorular üret.
 4. Kendi içinde tekrara düşme, her sorunun testteki diğer tüm sorulardan tamamen farklı bir bilgi/beceriyi ölçmesini sağla.
+5. Dokümanda yer alan yıldızlara (*), özel işaretlemelere veya vurgulu kısımlara takılıp kalma! Dokümanın geri kalan tüm düz paragraflarını, tablolarını ve detaylarını da eşit şekilde tarayarak soru üret. Tekrara düşmektense, dokümanın daha önce hiç soru yazılmamış diğer bölümlerine odaklan.
 `;
 
   const speedConstraints = `
@@ -323,8 +324,8 @@ Her soruda "subtopic" alanı olsun.`;
       parts: [{ text: systemPrompt }],
     },
     generationConfig: {
-      temperature: 0.85,
-      topP: 0.98,
+      temperature: 0.55, // Lowered from 0.85 to make the model strictly respect negative constraints (avoiding duplicate/similar questions)
+      topP: 0.95,
       topK: 40,
       maxOutputTokens: 8192,
       responseMimeType: 'application/json',
