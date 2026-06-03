@@ -5,6 +5,8 @@
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { topics } from '../data/topics';
+import { SYLLABUS_KEYS } from '../data/syllabusKeys';
 
 const API_KEY_STORAGE = '@kpss_gemini_api_key';
 const THEME_STORAGE = '@kpss_gemini_theme';
@@ -186,49 +188,91 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 }));
 
 export function cleanSubtopics(subtopics: string[]): string[] {
-  const MAIN_TOPIC_NAMES = new Set([
-    "İslamiyet Öncesi Türk Tarihi",
-    "İlk Türk İslam Devletleri",
+  const GENERIC_KEYWORDS = new Set([
+    'tarih', 'coğrafya', 'cografya', 'kpss', 'genel', 'ders', 'dersi', 'konu', 'konusu', 'soru', 'sorusu', 'test', 'testi',
+    'kültür', 'medeniyet', 'uygarlık', 'kültür ve medeniyet', 'kültür ve uygarlık'
+  ]);
+
+  // Build a dynamic set of all main topic names and syllabus keys, along with their cleaned variations
+  const forbiddenTopicNames = new Set<string>();
+
+  // Helper to add name and its variations
+  const addNameAndVariations = (rawName: string) => {
+    const name = rawName.toLowerCase().trim();
+    if (!name) return;
+
+    forbiddenTopicNames.add(name);
+
+    // 1. Strip page reference e.g., " (s. 2-8)", " (s.10-20)"
+    const noPage = name.replace(/\s*\(s\.\s*[\d\-–,\s]+\)\s*$/, '').trim();
+    if (noPage) forbiddenTopicNames.add(noPage);
+
+    // 2. Strip dash annotations e.g., " - gerileme", " - duraklama"
+    const noDash = noPage.replace(/\s*-\s*\w+\s*$/, '').trim();
+    if (noDash) forbiddenTopicNames.add(noDash);
+
+    // 3. Strip roman numerals and century references e.g., "xvii. yüzyılda ", "xx. yüzyıl başlarında "
+    const noCentury = noDash
+      .replace(/^(?:[i|v|x|l|c|d|m]+\.?\s*(?:yüzyılda|yy\.)?\s*(?:başlarında)?\s*)/gi, '')
+      .trim();
+    if (noCentury) forbiddenTopicNames.add(noCentury);
+
+    // 4. Strip common prefixes like "osmanlı devleti", "osmanlı", "türkiye'nin", "türkiye'de"
+    const prefixes = [
+      'osmanlı devleti', 'osmanlı', 
+      "türkiye'de", "türkiye’de", 
+      "türkiye'nin", "türkiye’nin"
+    ];
+    for (const prefix of prefixes) {
+      if (noCentury.startsWith(prefix)) {
+        const stripped = noCentury.substring(prefix.length).trim();
+        if (stripped.length > 3) {
+          forbiddenTopicNames.add(stripped);
+        }
+      }
+    }
+  };
+
+  // Add all static syllabus keys
+  SYLLABUS_KEYS.forEach(key => addNameAndVariations(key));
+
+  // Add all selectable app topics
+  topics.forEach(t => addNameAndVariations(t.name));
+
+  // Add specific historical period terms to be 100% safe
+  const extraPeriods = [
+    "Osmanlı Gerileme ve Dağılma Dönemi",
+    "Osmanlı Duraklama Dönemi",
     "Osmanlı Kuruluş Dönemi",
     "Osmanlı Yükselme Dönemi",
-    "Osmanlı Duraklama Dönemi",
-    "Osmanlı Gerileme ve Dağılma Dönemi",
-    "I. Dünya Savaşı ve Mondros Mütarekesi",
-    "Kurtuluş Savaşı Hazırlık Dönemi",
-    "Kurtuluş Savaşı Muharebeler Dönemi",
-    "Atatürk İlke ve İnkılapları",
-    "Çağdaş Türk ve Dünya Tarihi",
-    "Harita Bilgisi",
-    "Türkiye'nin Fiziki Coğrafyası (Yer Şekilleri)",
-    "Türkiye'nin İklimi",
-    "Türkiye'nin Bitki Örtüsü ve Toprak Yapısı",
-    "Türkiye'nin Su Kaynakları (Akarsular, Göller)",
-    "Türkiye'de Nüfus ve Yerleşme",
-    "Türkiye'nin Ekonomik Coğrafyası (Tarım)",
-    "Türkiye'nin Ekonomik Coğrafyası (Sanayi ve Enerji)",
-    "Türkiye'nin Ekonomik Coğrafyası (Ulaşım ve Ticaret)",
-    "Dünya Coğrafyası",
-    "tarih",
-    "coğrafya",
-    "genel",
-    "kpss",
-    "kpss tarih",
-    "kpss coğrafya",
-    "kpss coğrafyası",
-    "kpss dersi"
-  ]);
+    "Osmanlı Dönemi",
+    "Cumhuriyet Dönemi"
+  ];
+  extraPeriods.forEach(p => addNameAndVariations(p));
 
   return subtopics
     .map(s => s.trim())
     .filter(s => {
       if (!s) return false;
+      
       const lower = s.toLowerCase();
-      // Filter out if it matches a main topic name or generic term
-      if (MAIN_TOPIC_NAMES.has(s)) return false;
-      if (MAIN_TOPIC_NAMES.has(lower)) return false;
-      if (lower === 'tarih' || lower === 'coğrafya' || lower === 'genel' || lower === 'kpss') return false;
-      // Also filter out very long strings (e.g. model returned a whole sentence by mistake)
+
+      // If it's a generic word, reject it
+      if (GENERIC_KEYWORDS.has(lower)) return false;
+
+      // If it matches any forbidden topic name variant exactly, reject it
+      if (forbiddenTopicNames.has(lower)) return false;
+
+      // Reject if it is too long (e.g., Gemini wrote a whole sentence instead of a micro-concept)
       if (s.length > 120) return false;
-      return true;
+
+      // Reject if it matches any forbidden topic name variant as a substring
+      const isSubtopicMatch = Array.from(forbiddenTopicNames).some(forbidden => {
+        // Only do substring check for words longer than 5 letters to avoid false positives
+        if (forbidden.length <= 5) return false;
+        return lower === forbidden || lower.includes(forbidden);
+      });
+
+      return !isSubtopicMatch;
     });
 }

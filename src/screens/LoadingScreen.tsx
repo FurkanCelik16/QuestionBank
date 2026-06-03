@@ -118,7 +118,7 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
     // Retrieve recent question texts from history to prevent duplicate/similar questions
     const { history } = useHistoryStore.getState();
     const historyQuestionTexts = history
-      .slice(0, 3) // Last 3 tests (covers up to 60 questions, enough for context)
+      .slice(0, 6) // Last 6 tests (covers up to 120 questions, enough for context)
       .flatMap(h => {
         const list: string[] = [];
         if (h.questions) {
@@ -146,7 +146,7 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
     const combinedQuestionTexts = Array.from(new Set([
       ...historyQuestionTexts,
       ...seenQuestionTexts
-    ])).slice(0, 30); // Keep up to 30 unique question texts; prompt-level trim further reduces to 20
+    ])).slice(0, 60); // Keep up to 60 unique question texts; prompt-level trim further reduces to 40
 
     console.log('[Diagnostic] History length:', history.length);
     console.log('[Diagnostic] Combined question texts count:', combinedQuestionTexts.length);
