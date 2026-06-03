@@ -6,6 +6,7 @@ import { generateQuiz } from '../services/geminiService';
 import { useQuizStore } from '../store/useQuizStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useHistoryStore } from '../store/useHistoryStore';
+import { topics } from '../data/topics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { RouteProp } from '@react-navigation/native';
@@ -158,7 +159,9 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
     let finalPageRange = pdfPageRange;
     if (!finalPageRange && selectedTopics.length > 0) {
       const ranges: string[] = [];
-      selectedTopics.forEach((topicId) => {
+      selectedTopics.forEach((topicName) => {
+        const foundTopic = topics.find((t) => t.name === topicName);
+        const topicId = foundTopic ? foundTopic.id : topicName;
         if (ALL_TOPIC_PAGES[topicId]) {
           ranges.push(ALL_TOPIC_PAGES[topicId]);
         }

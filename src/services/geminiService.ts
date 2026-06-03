@@ -123,37 +123,167 @@ async function fetchGeminiWithFallback(
 // Prevents topic clustering by assigning each question a specific concept
 // ========================================
 
+// Static deterministic mapping from UI topic name to KPSS_SYLLABUS keys
+const TOPIC_TO_SYLLABUS_MAP: Record<string, string[]> = {
+  "İslamiyet Öncesi Türk Tarihi (S. 2-8)": [
+    "İslamiyet Öncesi Türk Tarihi",
+    "İslamiyet Öncesi Türk Devletleri Kültür ve Medeniyeti"
+  ],
+  "İlk Türk İslam Devletleri (S. 9-18)": [
+    "İlk Türk İslam Devletleri",
+    "İlk Türk-İslam Devletleri Kültür ve Medeniyeti",
+    "Anadolu Selçuklu ve İlk Beylikler"
+  ],
+  "Osmanlı Devleti Kültür ve Medeniyeti (S. 23-32)": [
+    "Osmanlı Devleti Kültür ve Uygarlığı"
+  ],
+  "Osmanlı Devleti Kuruluş ve Yükselme Dönemleri (S. 33-38)": [
+    "Osmanlı Kuruluş Dönemi",
+    "Osmanlı Yükselme Dönemi"
+  ],
+  "XVII. Yüzyılda Osmanlı Devleti - Duraklama (S. 39-41)": [
+    "Osmanlı Duraklama Dönemi"
+  ],
+  "XVIII. Yüzyılda Osmanlı Devleti - Gerileme (S. 42-43)": [
+    "Osmanlı Gerileme Dönemi"
+  ],
+  "XIX. Yüzyılda Osmanlı Devleti - Dağılma (S. 44-51)": [
+    "Osmanlı Dağılma Dönemi"
+  ],
+  "XX. Yüzyıl Başlarında Osmanlı Devleti (S. 52-61)": [
+    "I. Dünya Savaşı ve Mondros Mütarekesi"
+  ],
+  "Kurtuluş Savaşı Hazırlık Dönemi (S. 62-64)": [
+    "Kurtuluş Savaşı Hazırlık Dönemi"
+  ],
+  "I. TBMM Dönemi (S. 65-67)": [
+    "Kurtuluş Savaşı Hazırlık Dönemi"
+  ],
+  "Kurtuluş Savaşı Muharebeler Dönemi (S. 67-71)": [
+    "Kurtuluş Savaşı Muharebeler Dönemi"
+  ],
+  "Atatürk İlke ve İnkılapları (S. 73-87)": [
+    "Atatürk İlke ve İnkılapları"
+  ],
+  "Atatürk Dönemi Türk Dış Politikası (S. 88-89)": [
+    "Atatürk İlke ve İnkılapları"
+  ],
+  "Cumhuriyet Dönemi Kültür ve Medeniyet (S. 89-91)": [
+    "Atatürk İlke ve İnkılapları"
+  ],
+  "XX. Yüzyılın Başlarında Dünya - Çağdaş (S. 91-100)": [
+    "Çağdaş Türk ve Dünya Tarihi"
+  ],
+  "Soğuk Savaş Dönemi (S. 101-103)": [
+    "Çağdaş Türk ve Dünya Tarihi"
+  ],
+  "Yumuşama Dönemi ve Çatışmalar (S. 104-106)": [
+    "Çağdaş Türk ve Dünya Tarihi"
+  ],
+  "Küreselleşen Dünya (S. 109-114)": [
+    "Çağdaş Türk ve Dünya Tarihi"
+  ],
+  "Küresel Sorunlar (S. 115)": [
+    "Çağdaş Türk ve Dünya Tarihi"
+  ],
+  "Türkiye'nin Coğrafi Konumu (S. 3-13)": [
+    "Türkiye'nin İklimi"
+  ],
+  "Türkiye’nin Coğrafi Konumu (S. 3-13)": [
+    "Türkiye'nin İklimi"
+  ],
+  "Türkiye'nin Yerşekilleri (S. 23-42)": [
+    "Türkiye'nin Fiziki Coğrafyası (Yer Şekilleri)",
+    "Türkiye'nin Su Kaynakları (Akarsular, Göller)",
+    "Harita Bilgisi"
+  ],
+  "Türkiye’nin Yerşekilleri (S. 23-42)": [
+    "Türkiye'nin Fiziki Coğrafyası (Yer Şekilleri)",
+    "Türkiye'nin Su Kaynakları (Akarsular, Göller)",
+    "Harita Bilgisi"
+  ],
+  "Türkiye'de İklim, Bitki Örtüsü ve Toprak Tipleri (S. 55-70)": [
+    "Türkiye'nin İklimi",
+    "Türkiye'nin Bitki Örtüsü ve Toprak Yapısı"
+  ],
+  "Türkiye’de İklim, Bitki Örtüsü ve Toprak Tipleri (S. 55-70)": [
+    "Türkiye'nin İklimi",
+    "Türkiye'nin Bitki Örtüsü ve Toprak Yapısı"
+  ],
+  "Türkiye'de Nüfus ve Yerleşme (S. 85-97)": [
+    "Türkiye'de Nüfus ve Yerleşme"
+  ],
+  "Türkiye’de Nüfus ve Yerleşme (S. 85-97)": [
+    "Türkiye'de Nüfus ve Yerleşme"
+  ],
+  "Türkiye'de Tarım ve Hayvancılık (S. 110-122)": [
+    "Türkiye'nin Ekonomik Coğrafyası (Tarım)"
+  ],
+  "Türkiye’de Tarım ve Hayvancılık (S. 110-122)": [
+    "Türkiye'nin Ekonomik Coğrafyası (Tarım)"
+  ],
+  "Türkiye'de Madencilik ve Enerji Kaynakları (S. 132-141)": [
+    "Türkiye'nin Ekonomik Coğrafyası (Sanayi ve Enerji)"
+  ],
+  "Türkiye’de Madencilik ve Enerji Kaynakları (S. 132-141)": [
+    "Türkiye'nin Ekonomik Coğrafyası (Sanayi ve Enerji)"
+  ],
+  "Türkiye'de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)": [
+    "Türkiye'nin Ekonomik Coğrafyası (Ulaşım ve Ticaret)"
+  ],
+  "Türkiye’de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)": [
+    "Türkiye'nin Ekonomik Coğrafyası (Ulaşım ve Ticaret)"
+  ]
+};
+
+function normalizeKey(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/’/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const NORMALIZED_TOPIC_MAP: Record<string, string[]> = {};
+for (const [topic, syllabusKeys] of Object.entries(TOPIC_TO_SYLLABUS_MAP)) {
+  NORMALIZED_TOPIC_MAP[normalizeKey(topic)] = syllabusKeys;
+}
+
 /**
- * Matches a topic name (which may include page numbers like "İslamiyet Öncesi Türk Tarihi (S. 2-8)")
- * to a KPSS_SYLLABUS key (which is just "İslamiyet Öncesi Türk Tarihi").
+ * Maps a topic name (which may include page numbers like "İslamiyet Öncesi Türk Tarihi (S. 2-8)")
+ * to one or more KPSS_SYLLABUS keys.
  */
-function findSyllabusKey(topicName: string): string | null {
-  // Direct match first
-  if (KPSS_SYLLABUS[topicName]) return topicName;
-  // Strip page reference suffix like " (S. 2-8)" and try again
-  const stripped = topicName.replace(/\s*\(S\.\s*[\d\-–,\s]+\)\s*$/, '').trim();
-  if (KPSS_SYLLABUS[stripped]) return stripped;
+function findSyllabusKeys(topicName: string): string[] {
+  const norm = normalizeKey(topicName);
+  if (NORMALIZED_TOPIC_MAP[norm]) {
+    return NORMALIZED_TOPIC_MAP[norm];
+  }
   
-  // Fuzzy: match based on key historical era/concept terminologies
-  const strippedLower = stripped.toLowerCase();
+  // Fallback: If not found in the static map, try direct matching with keys in KPSS_SYLLABUS
+  const stripped = topicName.replace(/\s*\(S\.\s*[\d\-–,\s]+\)\s*$/, '').trim();
+  if (KPSS_SYLLABUS[stripped]) return [stripped];
+  
+  // Fuzzy fallback:
+  const strippedLower = normalizeKey(stripped);
   const keywords = ['kuruluş', 'yükselme', 'duraklama', 'gerileme', 'dağılma', 'kültür ve medeniyet', 'kültür ve uygarlık', 'islamiyet öncesi', 'türk islam'];
 
   for (const key of Object.keys(KPSS_SYLLABUS)) {
-    const keyLower = key.toLowerCase();
+    const keyNorm = normalizeKey(key);
     
-    // Check if both stripped topic and key share any unique period/unit keyword
+    // Check for exact start match
+    if (keyNorm.startsWith(strippedLower) || strippedLower.startsWith(keyNorm)) {
+      return [key];
+    }
+    
+    // Keyword match
     for (const kw of keywords) {
-      if (strippedLower.includes(kw) && keyLower.includes(kw)) {
-        return key;
+      if (strippedLower.includes(kw) && keyNorm.includes(kw)) {
+        return [key];
       }
     }
-    
-    // Fallback: startsWith / startsWith
-    if (keyLower.startsWith(strippedLower) || strippedLower.startsWith(keyLower)) {
-      return key;
-    }
   }
-  return null;
+  
+  return [];
 }
 
 /**
@@ -325,13 +455,15 @@ ${exclusionReminder}
   const allConcepts: { concept: string; topic: string }[] = [];
 
   for (const topicName of topics) {
-    const syllabusKey = findSyllabusKey(topicName);
-    if (!syllabusKey || !KPSS_SYLLABUS[syllabusKey]) continue;
+    const syllabusKeys = findSyllabusKeys(topicName);
+    for (const key of syllabusKeys) {
+      if (!KPSS_SYLLABUS[key]) continue;
 
-    const concepts = extractConceptsFromSyllabus(KPSS_SYLLABUS[syllabusKey]);
-    for (const concept of concepts) {
-      if (!excludeSet.has(concept.toLowerCase().trim())) {
-        allConcepts.push({ concept, topic: syllabusKey });
+      const concepts = extractConceptsFromSyllabus(KPSS_SYLLABUS[key]);
+      for (const concept of concepts) {
+        if (!excludeSet.has(concept.toLowerCase().trim())) {
+          allConcepts.push({ concept, topic: key });
+        }
       }
     }
   }
@@ -402,10 +534,12 @@ export async function generateQuiz(
   // Extract syllabus sub-topics details based on selected topics (using fuzzy key matcher)
   let syllabusContext = '';
   topics.forEach((topic) => {
-    const key = findSyllabusKey(topic);
-    if (key && KPSS_SYLLABUS[key]) {
-      syllabusContext += `- ${key}: ${KPSS_SYLLABUS[key]}\n`;
-    }
+    const keys = findSyllabusKeys(topic);
+    keys.forEach((key) => {
+      if (KPSS_SYLLABUS[key]) {
+        syllabusContext += `- ${key}: ${KPSS_SYLLABUS[key]}\n`;
+      }
+    });
   });
 
   // Clean excludeConcepts first to make sure there are no main topic names or generic terms
