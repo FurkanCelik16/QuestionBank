@@ -28,7 +28,7 @@ const modelOptions = [
 ];
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { apiKey, themeMode, geminiModel, askedQuestions, setApiKey, setThemeMode, setGeminiModel, clearApiKey, clearAskedQuestions } = useSettingsStore();
+  const { apiKey, themeMode, geminiModel, askedQuestions, seenQuestionTexts, setApiKey, setThemeMode, setGeminiModel, clearApiKey, clearAskedQuestions } = useSettingsStore();
   const colors = useTheme();
   
   const [inputKey, setInputKey] = useState(apiKey);
@@ -44,7 +44,11 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     // Sadece geçerli API anahtarı karakterlerini tut, görünmez mobil pano artıklarını ve boşlukları temizle
     const trimmedKey = inputKey.replace(/[^a-zA-Z0-9-_]/g, '').trim();
     if (!trimmedKey) {
-      Alert.alert('Uyarı', 'Lütfen bir API anahtarı girin.');
+      if (Platform.OS === 'web') {
+        window.alert('Lütfen bir API anahtarı girin.');
+      } else {
+        Alert.alert('Uyarı', 'Lütfen bir API anahtarı girin.');
+      }
       return;
     }
 
@@ -67,21 +71,30 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   };
 
   const handleClear = () => {
-    Alert.alert(
-      'API Anahtarını Sil',
-      'API anahtarınız silinecek. Emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            await clearApiKey();
-            setInputKey('');
+    if (Platform.OS === 'web') {
+      const confirm = window.confirm('API anahtarınız silinecek. Emin misiniz?');
+      if (confirm) {
+        clearApiKey().then(() => {
+          setInputKey('');
+        });
+      }
+    } else {
+      Alert.alert(
+        'API Anahtarını Sil',
+        'API anahtarınız silinecek. Emin misiniz?',
+        [
+          { text: 'İptal', style: 'cancel' },
+          {
+            text: 'Sil',
+            style: 'destructive',
+            onPress: async () => {
+              await clearApiKey();
+              setInputKey('');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleThemeChange = (mode: ThemeMode) => {
@@ -93,21 +106,32 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   };
 
   const handleClearMemory = () => {
-    Alert.alert(
-      'Soru Hafızasını Temizle',
-      `Daha önce sorulan soruların geçmişi (${askedQuestions.length} kavram) silinecektir. Yapay zeka aynı soruları tekrar sorabilir. Emin misiniz?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Temizle',
-          style: 'destructive',
-          onPress: async () => {
-            await clearAskedQuestions();
-            Alert.alert('Başarılı', 'Soru geçmişi hafızası başarıyla temizlendi.');
+    const totalCount = askedQuestions.length + seenQuestionTexts.length;
+    const msg = `Daha önce sorulan soruların geçmişi (${askedQuestions.length} kavram, ${seenQuestionTexts.length} soru metni) silinecektir. Yapay zeka aynı soruları tekrar sorabilir. Emin misiniz?`;
+    if (Platform.OS === 'web') {
+      const confirm = window.confirm(msg);
+      if (confirm) {
+        clearAskedQuestions().then(() => {
+          window.alert('Soru geçmişi hafızası başarıyla temizlendi.');
+        });
+      }
+    } else {
+      Alert.alert(
+        'Soru Hafızasını Temizle',
+        msg,
+        [
+          { text: 'İptal', style: 'cancel' },
+          {
+            text: 'Temizle',
+            style: 'destructive',
+            onPress: async () => {
+              await clearAskedQuestions();
+              Alert.alert('Başarılı', 'Soru geçmişi hafızası başarıyla temizlendi.');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const styles = getStyles(colors);
@@ -188,13 +212,13 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           {/* Soru Hafızası Section */}
           <Text style={styles.sectionTitle}>Soru Hafızası (Tekrar Engelleme)</Text>
           <Text style={styles.subtitle}>
-            Gemini'nin aynı konuları tekrar sormasını engellemek için son çözdüğün {askedQuestions.length} soru konusu hafızada tutuluyor.
+            Gemini'nin aynı konuları tekrar sormasını engellemek için son çözdüğün {askedQuestions.length} kavram ve {seenQuestionTexts.length} soru metni hafızada tutuluyor.
           </Text>
           <View style={styles.memoryContainer}>
             <TouchableOpacity
-              style={[styles.memoryButton, askedQuestions.length === 0 && styles.memoryButtonDisabled]}
+              style={[styles.memoryButton, (askedQuestions.length === 0 && seenQuestionTexts.length === 0) && styles.memoryButtonDisabled]}
               onPress={handleClearMemory}
-              disabled={askedQuestions.length === 0}
+              disabled={askedQuestions.length === 0 && seenQuestionTexts.length === 0}
               activeOpacity={0.8}
             >
               <Text style={styles.memoryButtonText}>Hafızayı Temizle</Text>

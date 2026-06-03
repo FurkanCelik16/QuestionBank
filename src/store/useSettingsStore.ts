@@ -10,6 +10,7 @@ const API_KEY_STORAGE = '@kpss_gemini_api_key';
 const THEME_STORAGE = '@kpss_gemini_theme';
 const MODEL_STORAGE = '@kpss_gemini_model';
 const ASKED_QUESTIONS_STORAGE = '@kpss_gemini_asked_questions';
+const SEEN_QUESTION_TEXTS_STORAGE = '@kpss_gemini_seen_question_texts';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -18,6 +19,7 @@ interface SettingsState {
   themeMode: ThemeMode;
   geminiModel: string;
   askedQuestions: string[];
+  seenQuestionTexts: string[];
   isLoaded: boolean;
 
   // Actions
@@ -26,6 +28,8 @@ interface SettingsState {
   setGeminiModel: (model: string) => Promise<void>;
   addAskedQuestions: (questions: string[]) => Promise<void>;
   clearAskedQuestions: () => Promise<void>;
+  addSeenQuestionTexts: (texts: string[]) => Promise<void>;
+  clearSeenQuestionTexts: () => Promise<void>;
   loadSettings: () => Promise<void>;
   clearApiKey: () => Promise<void>;
 }
@@ -35,6 +39,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   themeMode: 'dark', // Default theme
   geminiModel: 'gemini-3.1-flash-lite', // Default model
   askedQuestions: [],
+  seenQuestionTexts: [],
   isLoaded: false,
 
   setApiKey: async (key: string) => {
@@ -78,8 +83,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         return !cleanedExisting.some(ex => ex.toLowerCase().trim() === normalized);
       });
 
-      // Combine and keep the most recent 100 concepts to avoid huge payload sizes
-      const combined = [...uniqueNew, ...cleanedExisting].slice(0, 100);
+      // Combine and keep the most recent 300 concepts to avoid duplicate topics
+      const combined = [...uniqueNew, ...cleanedExisting].slice(0, 300);
 
       await AsyncStorage.setItem(ASKED_QUESTIONS_STORAGE, JSON.stringify(combined));
       set({ askedQuestions: combined });
@@ -91,19 +96,48 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   clearAskedQuestions: async () => {
     try {
       await AsyncStorage.removeItem(ASKED_QUESTIONS_STORAGE);
-      set({ askedQuestions: [] });
+      await AsyncStorage.removeItem(SEEN_QUESTION_TEXTS_STORAGE);
+      set({ askedQuestions: [], seenQuestionTexts: [] });
     } catch (error) {
       console.error('Soru geçmişi sıfırlama hatası:', error);
     }
   },
 
+  addSeenQuestionTexts: async (newTexts: string[]) => {
+    try {
+      const { seenQuestionTexts } = get();
+      const cleanedNew = newTexts.map(t => t.trim()).filter(Boolean);
+      // Filter out duplicates
+      const uniqueNew = cleanedNew.filter(t => {
+        const normalized = t.toLowerCase().trim();
+        return !seenQuestionTexts.some(ex => ex.toLowerCase().trim() === normalized);
+      });
+      // Keep up to 150 seen questions
+      const combined = [...uniqueNew, ...seenQuestionTexts].slice(0, 150);
+      await AsyncStorage.setItem(SEEN_QUESTION_TEXTS_STORAGE, JSON.stringify(combined));
+      set({ seenQuestionTexts: combined });
+    } catch (error) {
+      console.error('Görülen soruları kaydetme hatası:', error);
+    }
+  },
+
+  clearSeenQuestionTexts: async () => {
+    try {
+      await AsyncStorage.removeItem(SEEN_QUESTION_TEXTS_STORAGE);
+      set({ seenQuestionTexts: [] });
+    } catch (error) {
+      console.error('Görülen soruları sıfırlama hatası:', error);
+    }
+  },
+
   loadSettings: async () => {
     try {
-      const [key, theme, model, asked] = await Promise.all([
+      const [key, theme, model, asked, seen] = await Promise.all([
         AsyncStorage.getItem(API_KEY_STORAGE),
         AsyncStorage.getItem(THEME_STORAGE),
         AsyncStorage.getItem(MODEL_STORAGE),
         AsyncStorage.getItem(ASKED_QUESTIONS_STORAGE),
+        AsyncStorage.getItem(SEEN_QUESTION_TEXTS_STORAGE),
       ]);
 
       let parsedAsked: string[] = [];
@@ -115,6 +149,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         }
       }
 
+      let parsedSeen: string[] = [];
+      if (seen) {
+        try {
+          parsedSeen = JSON.parse(seen);
+        } catch {
+          parsedSeen = [];
+        }
+      }
+
       // Automatically sanitize legacy history on boot to repair any broad/corrupt topics
       const cleanedAsked = cleanSubtopics(Array.isArray(parsedAsked) ? parsedAsked : []);
 
@@ -123,6 +166,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         themeMode: (theme as ThemeMode) || 'dark',
         geminiModel: model || 'gemini-3.1-flash-lite',
         askedQuestions: cleanedAsked,
+        seenQuestionTexts: Array.isArray(parsedSeen) ? parsedSeen : [],
         isLoaded: true
       });
     } catch (error) {
@@ -184,7 +228,7 @@ export function cleanSubtopics(subtopics: string[]): string[] {
       if (MAIN_TOPIC_NAMES.has(lower)) return false;
       if (lower === 'tarih' || lower === 'coğrafya' || lower === 'genel' || lower === 'kpss') return false;
       // Also filter out very long strings (e.g. model returned a whole sentence by mistake)
-      if (s.length > 50) return false;
+      if (s.length > 120) return false;
       return true;
     });
 }

@@ -61,7 +61,11 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleGenerateSimilar = async () => {
     if (!apiKey) {
-      Alert.alert('API Anahtarı Gerekli', 'Lütfen Ayarlar ekranından API anahtarınızı kontrol edin.');
+      if (Platform.OS === 'web') {
+        window.alert('Lütfen Ayarlar ekranından API anahtarınızı kontrol edin.');
+      } else {
+        Alert.alert('API Anahtarı Gerekli', 'Lütfen Ayarlar ekranından API anahtarınızı kontrol edin.');
+      }
       return;
     }
     try {
@@ -82,7 +86,11 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
       });
     } catch (err: any) {
       console.error(err);
-      Alert.alert('Hata', 'Yapay zeka benzer soru oluştururken bir sorun yaşadı. Lütfen tekrar deneyin.');
+      if (Platform.OS === 'web') {
+        window.alert('Yapay zeka benzer soru oluştururken bir sorun yaşadı. Lütfen tekrar deneyin.');
+      } else {
+        Alert.alert('Hata', 'Yapay zeka benzer soru oluştururken bir sorun yaşadı. Lütfen tekrar deneyin.');
+      }
     } finally {
       setIsGeneratingSimilar(false);
     }

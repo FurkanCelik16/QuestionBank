@@ -116,6 +116,242 @@ async function fetchGeminiWithFallback(
   throw lastError || new Error('Gemini API bağlantı hatası.');
 }
 
+// ========================================
+// Question Distribution System
+// Prevents topic clustering by assigning each question a specific concept
+// ========================================
+
+/**
+ * Matches a topic name (which may include page numbers like "İslamiyet Öncesi Türk Tarihi (S. 2-8)")
+ * to a KPSS_SYLLABUS key (which is just "İslamiyet Öncesi Türk Tarihi").
+ */
+function findSyllabusKey(topicName: string): string | null {
+  // Direct match first
+  if (KPSS_SYLLABUS[topicName]) return topicName;
+  // Strip page reference suffix like " (S. 2-8)" and try again
+  const stripped = topicName.replace(/\s*\(S\.\s*[\d\-–,\s]+\)\s*$/, '').trim();
+  if (KPSS_SYLLABUS[stripped]) return stripped;
+  // Fuzzy: find any key that starts with the stripped name or vice versa
+  for (const key of Object.keys(KPSS_SYLLABUS)) {
+    if (key.startsWith(stripped) || stripped.startsWith(key)) return key;
+  }
+  return null;
+}
+
+/**
+ * Extracts individual micro-concepts from a KPSS_SYLLABUS entry string.
+ * Splits on commas and periods, filters short/generic fragments, returns unique concepts.
+ */
+function extractConceptsFromSyllabus(syllabusText: string): string[] {
+  // Split on periods first to get major sections, then split subsections on commas
+  const rawParts: string[] = [];
+  const sentences = syllabusText.split(/\.\s*/);
+  for (const sentence of sentences) {
+    // Each sentence may contain parenthetical details — keep them as part of the concept
+    const parts = sentence.split(/,\s*/);
+    for (const part of parts) {
+      const trimmed = part.trim().replace(/^[-•]\s*/, '');
+      if (trimmed.length >= 8 && trimmed.length <= 120) {
+        rawParts.push(trimmed);
+      }
+    }
+  }
+  // Deduplicate
+  return Array.from(new Set(rawParts));
+}
+
+/**
+ * Diverse question opening styles to prevent monotonous "Osmanlı Devleti'nde, X. yüzyılda..." patterns.
+ */
+const QUESTION_ENTRY_STYLES = [
+  'Doğrudan soru kökü ile başla (örn: "Aşağıdakilerden hangisi...")',
+  'Bir tarihi olayın sonuçlarını sorarak başla',
+  'Karşılaştırma formatında sor (örn: "I ve II numaralı yargılardan hangileri...")',
+  'Sebep-sonuç ilişkisi ile sor (örn: "... durumunun temel nedeni nedir?")',
+  'Bir kavramın tanımını vererek soruya gir (örn: "X olarak adlandırılan bu uygulama...")',
+  'Olumsuz soru kökü kullan (örn: "Aşağıdakilerden hangisi ... ile ilgili yanlış bir bilgidir?")',
+  'Kronolojik sıralama veya dönem karşılaştırması sor',
+  'Bir alıntı veya tarihi ifade ile başla (örn: "Bir tarihçi ... demiştir")',
+  'Doğrudan isim vererek başla (örn: "II. Mahmut döneminde kurulan...")',
+  'Verilen bilgilerden çıkarım yapma sorusu sor (örn: "Yukarıdaki bilgilere göre...")',
+  'Sonuçlardan hareketle olayı sordur (örn: "Bu gelişmelerin sonucunda...")',
+  'Coğrafi veya mekansal bağlam ile başla (örn: "Anadolu\'da/Balkanlarda...")',
+];
+
+/**
+ * Generates a deterministic question distribution plan.
+ * For topic (syllabus) mode: assigns each question a specific micro-concept from the syllabus.
+ * For PDF mode: assigns each question a page range segment.
+ * Returns a formatted string to embed in the prompt.
+ */
+function generateDistributionPlan(
+  questionCount: number,
+  topics: string[],
+  excludeConcepts: string[],
+  isPdfMode: boolean,
+  pdfPageRange?: string | null
+): string {
+  const excludeSet = new Set(excludeConcepts.map(c => c.toLowerCase().trim()));
+
+  // Shuffle entry styles so each test gets a different ordering
+  const shuffledStyles = [...QUESTION_ENTRY_STYLES];
+  let styleSeed = Date.now();
+  for (let i = shuffledStyles.length - 1; i > 0; i--) {
+    styleSeed = (styleSeed * 48271 + 11) & 0x7fffffff;
+    const j = styleSeed % (i + 1);
+    [shuffledStyles[i], shuffledStyles[j]] = [shuffledStyles[j], shuffledStyles[i]];
+  }
+
+  // Build compact exclusion reminder for the plan
+  const exclusionReminder = excludeConcepts.length > 0
+    ? `\n\u26d4 DAHA \u00d6NCE SORULAN KAVRAMLAR (bunlar\u0131 tekrar sorma, farkl\u0131 kavramlar se\u00e7):\n${excludeConcepts.slice(0, 15).map(c => `  \u2022 ${c}`).join('\n')}\n`
+    : '';
+
+  if (isPdfMode) {
+    if (pdfPageRange) {
+      // PDF mode with known page range: distribute questions across page segments
+      const ranges = pdfPageRange.split(',').map(r => r.trim());
+      const allNums: number[] = [];
+      for (const range of ranges) {
+        const parts = range.split(/[-–]/).map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+        allNums.push(...parts);
+      }
+      const totalStart = allNums.length > 0 ? Math.min(...allNums) : 1;
+      const totalEnd = allNums.length > 0 ? Math.max(...allNums) : 100;
+      const actualPageCount = totalEnd - totalStart + 1;
+      const isNarrowRange = actualPageCount <= 4;
+      const lines: string[] = [];
+
+      if (isNarrowRange) {
+        // Narrow range: do not assign specific pages to individual questions.
+        // Instead, allow the model to scan the entire narrow range, but focus on distinct micro-concepts.
+        for (let i = 0; i < questionCount; i++) {
+          const style = shuffledStyles[i % shuffledStyles.length];
+          lines.push(`- Soru ${i + 1} → Sayfa aralığı: ${totalStart}-${totalEnd} | Giriş tarzı: "${style}"`);
+        }
+
+        return `📋 SORU DAĞILIM PLANI (DAR SAYFA ARALIĞI):
+KRİTİK: Sorular YALNIZCA sayfa ${totalStart} ile ${totalEnd} arasından üretilmelidir. Bu aralık dışındaki sayfalardan KESİNLİKLE soru üretme!
+ÖNEMLİ: Hedef sayfa aralığı dar olduğu için (${actualPageCount} sayfa) sorular sayfalara katı olarak bölünmemiştir. Ancak ${questionCount} sorunun tamamı bu sayfalar içerisindeki tamamen FARKLI cümlelerden, FARKLI paragraflardan, tablolardan veya ayrıntılardan üretilmelidir. Kesinlikle aynı bilgiyi tekrar etme!
+${lines.join('\n')}
+${exclusionReminder}
+⚠️ BU PLAN ZORUNLUDUR: Sayfa ${totalStart}-${totalEnd} dışına KESİNLİKLE çıkma!`;
+      } else {
+        // Build page-level assignments that CYCLE within the range (never overflow!)
+        // If 20 questions / 10 pages → each page gets ~2 questions but from different micro-concepts
+        const segments: { start: number; end: number }[] = [];
+
+        if (questionCount <= actualPageCount) {
+          // More pages than questions: each question gets a unique segment
+          const segmentSize = Math.max(1, Math.floor(actualPageCount / questionCount));
+          for (let i = 0; i < questionCount; i++) {
+            const segStart = totalStart + (i * segmentSize);
+            const segEnd = Math.min(segStart + segmentSize - 1, totalEnd);
+            segments.push({ start: segStart, end: segEnd });
+          }
+        } else {
+          // More questions than pages: cycle through pages, multiple questions per page
+          for (let i = 0; i < questionCount; i++) {
+            const pageOffset = i % actualPageCount;
+            const page = totalStart + pageOffset;
+            segments.push({ start: page, end: page });
+          }
+        }
+
+        // Shuffle segments so the model doesn't always start from the same page
+        let segSeed = styleSeed;
+        for (let i = segments.length - 1; i > 0; i--) {
+          segSeed = (segSeed * 48271 + 11) & 0x7fffffff;
+          const j = segSeed % (i + 1);
+          [segments[i], segments[j]] = [segments[j], segments[i]];
+        }
+
+        for (let i = 0; i < segments.length; i++) {
+          const style = shuffledStyles[i % shuffledStyles.length];
+          const pageLabel = segments[i].start === segments[i].end
+            ? `Sayfa: ${segments[i].start}`
+            : `Sayfa aralığı: ${segments[i].start}-${segments[i].end}`;
+          lines.push(`- Soru ${i + 1} → ${pageLabel} | Giriş tarzı: "${style}"`);
+        }
+
+        return `📋 SORU DAĞILIM PLANI (ZORUNLU SAYFA ATAMALARI):
+KRİTİK: Sorular YALNIZCA sayfa ${totalStart} ile ${totalEnd} arasından üretilmelidir. Bu aralık dışındaki sayfalardan KESİNLİKLE soru üretme!
+Her soru KESİNLİKLE kendisine atanmış sayfadaki bilgilerden üretilmelidir.
+${questionCount > actualPageCount ? `Not: Bazı sayfalardan birden fazla soru üretilecek. Bu durumda her soru o sayfadaki FARKLI bir mikro kavram/detay hakkında olmalıdır.` : ''}
+${lines.join('\n')}
+${exclusionReminder}
+⚠️ BU PLAN ZORUNLUDUR: Sayfa ${totalStart}-${totalEnd} dışına KESİNLİKLE çıkma!`;
+      }
+    }
+
+    // PDF mode without page range: tell the model to self-distribute across the ENTIRE document
+    const lines: string[] = [];
+    for (let i = 0; i < questionCount; i++) {
+      const style = shuffledStyles[i % shuffledStyles.length];
+      lines.push(`- Soru ${i + 1} \u2192 B\u00f6l\u00fcm: ${i + 1}/${questionCount} | Giri\u015f tarz\u0131: "${style}"`);
+    }
+
+    return `\ud83d\udccb SORU DA\u011eILIM PLANI (ZORUNLU DOK\u00dcMAN B\u00d6L\u00dcM ATAMALARI):
+PDF dok\u00fcman\u0131n\u0131 toplam ${questionCount} e\u015fit b\u00f6l\u00fcme ay\u0131r. Her soru KES\u0130NL\u0130KLE farkl\u0131 bir b\u00f6l\u00fcmden \u00fcretilmelidir.
+\u00d6rnek: Dok\u00fcman 60 sayfa ve ${questionCount} soru isteniyorsa, her ${Math.max(1, Math.floor(60 / questionCount))} sayfadan 1 soru \u00fcret.
+
+${lines.join('\n')}
+${exclusionReminder}
+\u26a0\ufe0f BU PLAN ZORUNLUDUR:
+- Dok\u00fcman\u0131n ilk sayfalar\u0131na veya tek bir b\u00f6l\u00fcm\u00fcne y\u0131\u011f\u0131lma YASAKTIR!
+- Her soru dok\u00fcman\u0131n farkl\u0131 bir fiziksel b\u00f6lgesinden (farkl\u0131 sayfalardan) gelmelidir.
+- Dok\u00fcman\u0131n SON YARISI en az ${Math.ceil(questionCount / 2)} soru i\u00e7ermelidir \u2014 modelin ilk sayfalara tak\u0131l\u0131p kalmas\u0131 engellenmektedir.`;
+  }
+
+  // Topic/Syllabus mode: extract concepts and distribute
+  const allConcepts: { concept: string; topic: string }[] = [];
+
+  for (const topicName of topics) {
+    const syllabusKey = findSyllabusKey(topicName);
+    if (!syllabusKey || !KPSS_SYLLABUS[syllabusKey]) continue;
+
+    const concepts = extractConceptsFromSyllabus(KPSS_SYLLABUS[syllabusKey]);
+    for (const concept of concepts) {
+      if (!excludeSet.has(concept.toLowerCase().trim())) {
+        allConcepts.push({ concept, topic: syllabusKey });
+      }
+    }
+  }
+
+  if (allConcepts.length === 0) {
+    // Fallback: no concepts could be extracted (shouldn't happen but be safe)
+    return '';
+  }
+
+  // Shuffle the concepts using the same strong seed as styles
+  const shuffled = [...allConcepts];
+  let conceptSeed = styleSeed;
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    conceptSeed = (conceptSeed * 48271 + 11) & 0x7fffffff;
+    const j = conceptSeed % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Select concepts for each question (cycle if not enough unique concepts)
+  const selected = [];
+  for (let i = 0; i < questionCount; i++) {
+    selected.push(shuffled[i % shuffled.length]);
+  }
+
+  // Build the distribution plan text
+  const lines: string[] = [];
+  for (let i = 0; i < selected.length; i++) {
+    const style = shuffledStyles[i % shuffledStyles.length];
+    lines.push(`- Soru ${i + 1} → Konu: "${selected[i].topic}" | Kavram: "${selected[i].concept}" | Giriş tarzı: "${style}"`);
+  }
+
+  return `📋 SORU DAĞILIM PLANI (ZORUNLU KAVRAM ATAMALARI):
+Her soru KESİNLİKLE kendisine atanmış kavram hakkında olmalıdır. Sırayı değiştirmek serbesttir ancak başka bir kavramdan soru üretmek YASAKTIR.
+${lines.join('\n')}
+${exclusionReminder}
+⚠️ BU PLAN ZORUNLUDUR: Yukarıdaki her satır bir soruyu temsil eder. Her soru kendi kavramından üretilmeli ve farklı bir giriş tarzı kullanmalıdır.`;
+}
+
 /**
  * Generates a quiz using Gemini API based on selected topics, question count, difficulty, and optional PDF.
  */
@@ -145,30 +381,53 @@ export async function generateQuiz(
   const topicsString = topics.join(', ');
   const difficultyInstruction = DIFFICULTY_PROMPTS[difficulty];
 
-  // Extract syllabus sub-topics details based on selected topics
+  // Extract syllabus sub-topics details based on selected topics (using fuzzy key matcher)
   let syllabusContext = '';
   topics.forEach((topic) => {
-    if (KPSS_SYLLABUS[topic]) {
-      syllabusContext += `- ${topic}: ${KPSS_SYLLABUS[topic]}\n`;
+    const key = findSyllabusKey(topic);
+    if (key && KPSS_SYLLABUS[key]) {
+      syllabusContext += `- ${key}: ${KPSS_SYLLABUS[key]}\n`;
     }
   });
 
   // Clean excludeConcepts first to make sure there are no main topic names or generic terms
-  const cleanedExclusions = cleanSubtopics(excludeConcepts);
+  const cleanedExclusions = cleanSubtopics(excludeConcepts).slice(0, 40); // Max 40 concepts to avoid prompt bloat
 
-  // Prepare deduplication instruction if we have previously asked questions/concepts
+  // Trim question texts to max 20 to avoid overwhelming the model
+  const trimmedExcludeTexts = excludeQuestionTexts.slice(0, 20);
+
+  // Generate the forced distribution plan (the core anti-clustering mechanism)
+  const isPdfMode = !!(pdfBase64 || pdfUri);
+  
+  let actualPageCount = 100;
+  if (isPdfMode && pdfPageRange) {
+    const ranges = pdfPageRange.split(',').map(r => r.trim());
+    const allNums: number[] = [];
+    for (const range of ranges) {
+      const parts = range.split(/[-–]/).map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+      allNums.push(...parts);
+    }
+    const totalStart = allNums.length > 0 ? Math.min(...allNums) : 1;
+    const totalEnd = allNums.length > 0 ? Math.max(...allNums) : 100;
+    actualPageCount = totalEnd - totalStart + 1;
+  }
+  const isNarrowRange = isPdfMode && !!pdfPageRange && actualPageCount <= 4;
+
+  const distributionPlan = generateDistributionPlan(
+    questionCount,
+    topics,
+    cleanedExclusions,
+    isPdfMode,
+    pdfPageRange
+  );
+
+  // Prepare compact deduplication instruction (secondary to distribution plan)
   const excludeInstruction = cleanedExclusions.length > 0
-    ? `\nÖNEMLİ (KAVRAMSAL TEKRAR ENGELLEME HAFIZASI - SON DERECE KRİTİK):
-Aşağıda belirtilen spesifik kavramlar/alt başlıklar hakkında daha önce sorular sorulmuştur. Bu nedenle, BU KAVRAMLARDAN VEYA BUNLARLA YAKINDAN İLGİLİ, EŞ ANLAMLI YA DA AYNI KONU GRUBUNDAKİ ALT DETAYLARDAN KESİNLİKLE TEKRAR SORU ÜRETME!
-Eğer yasaklı listede "Uygurlar Maniheizm" varsa, Uygurların dini inançlarıyla ilgili hiçbir şey sorma; onun yerine Uygurların tarım faaliyetleri, matbaası veya göç destanları gibi tamamen farklı alanlarına odaklan.
-[KESİNLİKLE YASAKLI / DAHA ÖNCE SORULAN KAVRAMLAR VE ALT BAŞLIKLAR]: ${cleanedExclusions.join(', ')}\n`
+    ? `\n🔴 Daha önce sorulan kavramlar (bu kavramları tekrar SORMA):\n${cleanedExclusions.slice(0, 20).map(c => `- ${c.trim()}`).join('\n')}\n`
     : '';
 
-  const excludeQuestionsInstruction = excludeQuestionTexts.length > 0
-    ? `\nÖNEMLİ (BENZER SORU ENGELLEME HAFIZASI - SON DERECE KRİTİK):
-Aşağıdaki sorular daha önce kullanıcıya sorulmuştur. Yeni üreteceğin soruların KESİNLİKLE bu sorularla aynı bilgiyi ölçmesine, benzer kurguda olmasına veya aynı soru kökünü/şık seçeneklerini kullanmasına İZİN VERİLMEMEKTEDİR! 
-Her bir yeni soru, aşağıdaki listede yer alan sorulardan tamamen farklı bir kurguya, bilgi odağına ve yaklaşıma sahip olmalıdır. Aynı konudan olsa bile farklı bir detayı sorgulamalıdır:
-${excludeQuestionTexts.map((q, idx) => `${idx + 1}. "${q.trim()}"`).join('\n')}\n`
+  const excludeQuestionsInstruction = trimmedExcludeTexts.length > 0
+    ? `\n🚫 Son çözülen sorular (benzerlerini üretME):\n${trimmedExcludeTexts.map(q => `- ${q.trim().substring(0, 80)}`).join('\n')}\n`
     : '';
 
   const varietyAndCoverageMandate = `
@@ -176,15 +435,26 @@ ${excludeQuestionTexts.map((q, idx) => `${idx + 1}. "${q.trim()}"`).join('\n')}\
 1. Ürettiğin ${questionCount} sorunun her biri müfredat detaylarında geçen **tamamen farklı, bağımsız ve benzersiz** bir mikro kavram/alt başlık ile ilgili olmalıdır.
 2. Kesinlikle aynı mikro kavramdan/alt başlıktan birden fazla soru üretme! (Örneğin; 1 soru Kurultay hakkındaysa, diğer sorular ikili teşkilat, kut anlayışı, destanlar veya uygurların kültürel mirası gibi tamamen farklı ve bağımsız diğer kavramlardan olmalıdır.)
 3. Müfredat listesindeki kavramları dengeli, geniş ve adil bir şekilde tarayarak her soru için farklı bir odak seç. Kolaycı davranıp en popüler 2-3 kavramı tekrar edip durma. Kıyıda köşede kalmış, derin ÖSYM tarzı KPSS detaylarına da mutlaka yer ver.
+4. DİL VE YAPI ŞABLONU TEKRAR YASAĞI (MONOTONLUK ENGELİ): Soruların başlangıç ve cümle yapılarını sürekli aynı şablonla kurma! (Örneğin; bir sorunun başında "Osmanlı Devleti'nde, 17. yüzyılda..." veya "Osmanlı Devleti'nde..." diyorsan, diğer soruların başına kesinlikle aynı kalıpları koyma! Soruları farklı dil yapılarıyla, doğrudan soru kökleriyle veya farklı giriş tarzlarıyla sor. Her sorunun tümce yapısı ve dili birbirinden farklı olmalı, monoton bir ritim oluşturmamalıdır.)
+5. ARD ARDA AYNI KONU YIĞILMA YASAĞI (KONU KARIŞTIRMA / SHUFFLE): Aynı konudan (örneğin toprak sistemi, divan üyeleri veya padişah ıslahatları) olan soruları KESİNLİKLE art arda sıralama! Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda 2 tane toprak sorusu veya 2 tane 17. yüzyıl sorusu çözmemelidir. Konular test geneline homojen olarak dağıtılmalıdır.
 `;
 
   const pdfVarietyAndCoverageMandate = `
-ÇEŞİTLİLİK VE DOKÜMAN KAPSAMI KURALI:
+ÇEŞİTLİLİK, DOKÜMANIN DERİNLİKLERİNE İNME VE YAYILIM KURALI:
 1. Ürettiğin ${questionCount} sorunun her biri PDF dokümanındaki **tamamen farklı ve bağımsız** bölümler, sayfalar, paragraflar ve mikro kavramlar ile ilgili olmalıdır.
-2. Kesinlikle aynı sayfadan, aynı paragraftan veya aynı mikro kavramdan birden fazla soru üretme! Dokümanın geneline yayılarak geniş, zengin ve çeşitli bir bilgi kapsamı sağla.
-3. PDF dokümanının baş kısımlarında sıkışıp kalma; dokümanın orta ve son kısımlarındaki derin detayları, tablolardaki küçük bilgileri, dipnotları ve kritik ayrıntıları da taranarak benzersiz sorular üret.
+${isNarrowRange 
+  ? `2. KESİNLİKLE her sorunun o sayfalardaki tamamen farklı paragraflardan, farklı cümlelerden ve farklı detaylardan üretildiğinden emin ol. Sayfa aralığı çok dar olduğu için (${actualPageCount} sayfa) aynı sayfadan çok sayıda soru üretilecektir; ancak kendi içinde tekrara düşmek kesinlikle yasaktır!`
+  : `2. KESİNLİKLE aynı sayfadan, aynı paragraftan veya aynı mikro kavramdan birden fazla soru üretme! Dokümanın geneline yayılarak geniş, zengin ve çeşitli bir bilgi kapsamı sağla.`
+}
+3. PDF dokümanının ilk sayfalarında veya en belirgin giriş kısımlarında sıkışıp kalma! Dokümanın orta ve son kısımlarındaki derin detayları, tablolardaki küçük bilgileri, dipnotları ve kritik ayrıntıları özellikle tara ve buralardan benzersiz sorular üret.
 4. Kendi içinde tekrara düşme, her sorunun testteki diğer tüm sorulardan tamamen farklı bir bilgi/beceriyi ölçmesini sağla.
-5. Dokümanda yer alan yıldızlara (*), özel işaretlemelere veya vurgulu kısımlara takılıp kalma! Dokümanın geri kalan tüm düz paragraflarını, tablolarını ve detaylarını da eşit şekilde tarayarak soru üret. Tekrara düşmektense, dokümanın daha önce hiç soru yazılmamış diğer bölümlerine odaklan.
+5. DOKÜMANDAKİ YILDIZLAR VE SEÇİCİLİK: Dokümanda yer alan yıldızlara (*), özel işaretlemelere veya vurgulu kısımlara takılıp kalma! Yıldızlı kısımlar daha önce sorulmuş ve tüketilmiş olabilir. Dokümanın geri kalan tüm düz paragraflarını, tablolarını ve detaylarını da eşit şekilde tarayarak soru üret. Tekrara düşmektense, dokümanın daha önce hiç soru yazılmamış diğer bölümlerine odaklan.
+${isNarrowRange 
+  ? `6. DAR ARALIK ÖZEL KURALI: Sayfa aralığı çok dar olduğu için (${actualPageCount} sayfa) her sayfadan çok sayıda soru üretilmesi gerekecektir. Bu durumda, her bir sorunun o sayfalardaki tamamen farklı paragraflardan, farklı cümlelerden ve farklı detaylardan üretildiğinden emin ol. Aynı konuyu/soruyu hafifçe değiştirip tekrar sorma, her soru yeni bir bilgiyi ölçsün.`
+  : `6. SAYFA DAĞILIMI VE DERİN TARAMA: Soruları dokümanın sayfalarına dengeli bir şekilde dağıt. Dokümanı sayfa sayısına göre kabaca eşit bölümlere ayır ve her bölümden eşit sayıda soru üretmeye çalış. Örneğin 10 sayfalık bir dokümandan 20 soru isteniyorsa, her sayfadan ortalama 2 soru üret. Tek bir sayfaya veya bölüme yığılma yapma.`
+}
+7. DİL VE YAPI ŞABLONU TEKRAR YASAĞI (MONOTONLUK ENGELİ): Soruların başlangıç ve cümle yapılarını sürekli aynı şablonla kurma! (Örneğin; bir sorunun başında "Osmanlı Devleti'nde, 17. yüzyılda..." veya "Osmanlı Devleti'nde..." diyorsan, diğer soruların başına kesinlikle aynı kalıpları koyma! Soruları farklı dil yapılarıyla, doğrudan soru kökleriyle veya farklı giriş tarzlarıyla sor. Her sorunun tümce yapısı ve dili birbirinden farklı olmalı, monoton bir ritim oluşturmamalıdır.)
+8. ARD ARDA AYNI KONU YIĞILMA YASAĞI (KONU KARIŞTIRMA / SHUFFLE): Aynı konudan (örneğin toprak sistemi, divan üyeleri veya padişah ıslahatları) olan soruları KESİNLİKLE art arda sıralama! Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda 2 tane toprak sorusu veya 2 tane 17. yüzyıl sorusu çözmemelidir. Konular test geneline homojen olarak dağıtılmalıdır.
 `;
 
   const speedConstraints = `
@@ -246,14 +516,18 @@ ${topics.length > 0
 1. Dokümanın sadece ilk sayfalarıyla veya genel tanımların geçtiği giriş kısımlarıyla sınırlı kalma. Belgenin ortalarındaki, sonlarındaki sayfaları da tam olarak oku ve analiz et.
 2. Tablolardaki verileri, dipnotları, kıyıda köşede kalmış çok spesifik detayları, kanun maddelerini, isimleri, tarihleri ve en ince ayrıntıları özellikle tarayarak buralardan uzmanlık seviyesinde sorular üret.
 3. Genel geçer veya herkesin bildiği bilgiler yerine, dokümana has olan, derin KPSS/ÖSYM mantığına uygun ve adayları eleyecek nitelikte seçici detaylara odaklan.
-${excludeInstruction}${excludeQuestionsInstruction}${extremeMandate}${mapInstructionToUse}
+${extremeMandate}${mapInstructionToUse}
+
+${distributionPlan}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`
     : `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${varietyAndCoverageMandate}
 MÜFREDAT BİLGİSİ:
 Aşağıdaki KPSS müfredatı detaylarını referans al ve YALNIZCA seçilen şu konular [${topicsString}] hakkında soru sor. Diğer konulara kesinlikle girme:
 ${syllabusContext}
-${excludeInstruction}${excludeQuestionsInstruction}${extremeMandate}${mapInstructionToUse}
+${extremeMandate}${mapInstructionToUse}
+
+${distributionPlan}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`;
 
@@ -264,25 +538,31 @@ ${topics.length > 0
       ? `Seçilen Konular: [${topicsString}] (Sadece bu konularla sınırlı kal!)`
       : 'Konu Kısıtlaması: Yok (Müfredatı tamamen unut ve sadece PDF içeriğini tara)'}
 
-BU TEST İÇİN SIKILAŞTIRILMIŞ TALİMUTLAR:
+${distributionPlan}
+
+BU TEST İÇİN TALİMATLAR:
 1. ${topics.length > 0
       ? `Yalnızca seçilen konularla [${topicsString}] sınırlı kalmak ve PDF içinden bu konuları bulmak üzere`
       : `Sadece ve sadece PDF belgesinin tamamından${pdfPageRange ? ` (özellikle belirtilen [${pdfPageRange}] sayfalarından)` : ''}`} ${questionCount} adet benzersiz KPSS sorusu üret.
 2. Dışarıdan veya genel müfredat havuzundan hiçbir ek bilgi ekleme.
-3. ${pdfVarietyAndCoverageMandate}
-${excludeInstruction ? `4. ${excludeInstruction}` : ''}
-${excludeQuestionsInstruction ? `5. ${excludeQuestionsInstruction}` : ''}
+3. DAĞILIM PLANINA UYUM: Yukarıdaki soru dağıtım planındaki her satıra sadık kal. Her soru kendisine atanmış sayfa aralığı/kavramdan üretilmelidir.
 
-Her soruda "subtopic" alanı olsun.`
+Her soruda "subtopic" alanı olsun.
+
+${excludeInstruction}
+${excludeQuestionsInstruction}`
     : `Seçilen Konular: [${topicsString}]
 
-BU TEST İÇİN SIKILAŞTIRILMIŞ TALİMUTLAR:
-1. Seçilen konulardan ${questionCount} adet benzersiz KPSS sorusu üret.
-2. ${varietyAndCoverageMandate}
-${excludeInstruction ? `3. ${excludeInstruction}` : ''}
-${excludeQuestionsInstruction ? `4. ${excludeQuestionsInstruction}` : ''}
+${distributionPlan}
 
-Her soruda "subtopic" alanı olsun.`;
+BU TEST İÇİN TALİMATLAR:
+1. Seçilen konulardan ${questionCount} adet benzersiz KPSS sorusu üret.
+2. DAĞILIM PLANINA UYUM: Yukarıdaki soru dağıtım planındaki her satıra sadık kal. Her soru kendisine atanmış kavramdan üretilmelidir.
+
+Her soruda "subtopic" alanı olsun.
+
+${excludeInstruction}
+${excludeQuestionsInstruction}`;
 
   const parts: any[] = [];
 
@@ -324,7 +604,7 @@ Her soruda "subtopic" alanı olsun.`;
       parts: [{ text: systemPrompt }],
     },
     generationConfig: {
-      temperature: 0.55, // Lowered from 0.85 to make the model strictly respect negative constraints (avoiding duplicate/similar questions)
+      temperature: isPdfMode ? 0.75 : 0.80, // Raised to allow diversity; distribution plan enforces structure instead of temperature
       topP: 0.95,
       topK: 40,
       maxOutputTokens: 8192,
@@ -358,13 +638,17 @@ Her soruda "subtopic" alanı olsun.`;
                 },
                 correct_answer: { type: 'STRING' },
                 rational_explanation: { type: 'STRING' },
+                page_number: {
+                  type: 'INTEGER',
+                  description: 'Sorunun üretildiği PDF belgesindeki sayfa numarası (1-indexed). Harici müfredat sorusu ise 0 yaz.'
+                },
                 highlighted_province_ids: {
                   type: 'ARRAY',
                   items: { type: 'INTEGER' },
                   description: 'Coğrafya haritalı sorularında vurgulanması/işaretlenmesi istenen illerin plaka kodları (1-81 arası tamsayılar). Haritasız normal sorularda bu alanı tamamen boş bırak veya ekleme.'
                 },
               },
-              required: ['id', 'type', 'question_text', 'subtopic', 'options', 'correct_answer', 'rational_explanation'],
+              required: ['id', 'type', 'question_text', 'subtopic', 'options', 'correct_answer', 'rational_explanation', 'page_number'],
             },
           },
         },
@@ -477,6 +761,7 @@ Her soruda "subtopic" alanı olsun.`;
         },
         correct_answer: q.correct_answer || 'A',
         rational_explanation: q.rational_explanation || 'Açıklama mevcut değil.',
+        page_number: q.page_number !== undefined ? Number(q.page_number) : undefined,
       };
 
       if (!question.question_text) {

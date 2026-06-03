@@ -113,12 +113,12 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const fetchQuiz = async () => {
     const { pdfBase64, geminiFileUri, pdfPageRange, pdfName, pdfUri } = useQuizStore.getState();
-    const { askedQuestions, addAskedQuestions } = useSettingsStore.getState();
+    const { askedQuestions, addAskedQuestions, seenQuestionTexts, addSeenQuestionTexts } = useSettingsStore.getState();
 
     // Retrieve recent question texts from history to prevent duplicate/similar questions
     const { history } = useHistoryStore.getState();
-    const recentQuestionTexts = history
-      .slice(0, 5) // Last 5 tests
+    const historyQuestionTexts = history
+      .slice(0, 3) // Last 3 tests (covers up to 60 questions, enough for context)
       .flatMap(h => {
         const list: string[] = [];
         if (h.questions) {
@@ -140,12 +140,17 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         }
         return list;
       })
-      .filter(Boolean)
-      .slice(0, 40); // Keep max 40 question texts to avoid bloating the prompt
+      .filter(Boolean);
+
+    // Combine history question texts and immediately-saved seenQuestionTexts
+    const combinedQuestionTexts = Array.from(new Set([
+      ...historyQuestionTexts,
+      ...seenQuestionTexts
+    ])).slice(0, 30); // Keep up to 30 unique question texts; prompt-level trim further reduces to 20
 
     console.log('[Diagnostic] History length:', history.length);
-    console.log('[Diagnostic] Recent question texts count:', recentQuestionTexts.length);
-    console.log('[Diagnostic] Recent question texts:', JSON.stringify(recentQuestionTexts, null, 2));
+    console.log('[Diagnostic] Combined question texts count:', combinedQuestionTexts.length);
+    console.log('[Diagnostic] Combined question texts:', JSON.stringify(combinedQuestionTexts, null, 2));
     console.log('[Diagnostic] Asked questions (concepts) count:', askedQuestions.length);
     console.log('[Diagnostic] Asked questions (concepts):', JSON.stringify(askedQuestions, null, 2));
 
@@ -188,14 +193,21 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         geminiFileUri,
         finalPageRange,
         pdfName,
-        recentQuestionTexts
+        combinedQuestionTexts
       );
 
-      // Save new question subtopics to local history
+      // Save new question texts and subtopics immediately upon generation
       if (quiz.questions) {
+        const newQuestionTexts = quiz.questions
+          .map((q) => q.question_text || '')
+          .filter(Boolean);
         const newSubtopics = quiz.questions
           .map((q) => q.subtopic || '')
           .filter(Boolean);
+        
+        if (newQuestionTexts.length > 0) {
+          await addSeenQuestionTexts(newQuestionTexts);
+        }
         if (newSubtopics.length > 0) {
           await addAskedQuestions(newSubtopics);
         }
@@ -267,13 +279,21 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
               newGeminiFileUri,
               finalPageRange,
               pdfName,
-              recentQuestionTexts
+              combinedQuestionTexts
             );
 
+            // Save new question texts and subtopics immediately upon generation
             if (quiz.questions) {
+              const newQuestionTexts = quiz.questions
+                .map((q) => q.question_text || '')
+                .filter(Boolean);
               const newSubtopics = quiz.questions
                 .map((q) => q.subtopic || '')
                 .filter(Boolean);
+              
+              if (newQuestionTexts.length > 0) {
+                await addSeenQuestionTexts(newQuestionTexts);
+              }
               if (newSubtopics.length > 0) {
                 await addAskedQuestions(newSubtopics);
               }

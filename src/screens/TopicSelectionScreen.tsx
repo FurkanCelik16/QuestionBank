@@ -138,14 +138,25 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleStartQuiz = () => {
     if (!apiKey) {
-      Alert.alert('API Anahtarı Gerekli',
-        'Test oluşturmak için önce Gemini API anahtarınızı girmelisiniz.',
-        [{ text: 'İptal', style: 'cancel' },
-         { text: 'Ayarlara Git', onPress: () => navigation.navigate('Settings') }]);
+      if (Platform.OS === 'web') {
+        const confirm = window.confirm('Test oluşturmak için önce Gemini API anahtarınızı girmelisiniz. Ayarlar sayfasına gitmek ister misiniz?');
+        if (confirm) {
+          navigation.navigate('Settings');
+        }
+      } else {
+        Alert.alert('API Anahtarı Gerekli',
+          'Test oluşturmak için önce Gemini API anahtarınızı girmelisiniz.',
+          [{ text: 'İptal', style: 'cancel' },
+           { text: 'Ayarlara Git', onPress: () => navigation.navigate('Settings') }]);
+      }
       return;
     }
     if (selectedTopics.length === 0 && !pdfUri) {
-      Alert.alert('Seçim Yapın', 'Lütfen en az bir konu seçin veya bir PDF dokümanı yükleyin.');
+      if (Platform.OS === 'web') {
+        window.alert('Lütfen en az bir konu seçin veya bir PDF dokümanı yükleyin.');
+      } else {
+        Alert.alert('Seçim Yapın', 'Lütfen en az bir konu seçin veya bir PDF dokümanı yükleyin.');
+      }
       return;
     }
     const names = topics.filter((t) => selectedTopicsSet.has(t.id)).map((t) => t.name);
@@ -272,14 +283,21 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation }) => {
                     <TouchableOpacity
                       style={s.slotDeleteBtn}
                       onPress={() => {
-                        Alert.alert(
-                          'Dokümanı Sil',
-                          `"${slot.name}" belgesini silmek istediğinize emin misiniz?`,
-                          [
-                            { text: 'Vazgeç', style: 'cancel' },
-                            { text: 'Sil', style: 'destructive', onPress: () => clearPdfSlot(slotId) },
-                          ]
-                        );
+                        if (Platform.OS === 'web') {
+                          const confirm = window.confirm(`"${slot.name}" belgesini silmek istediğinize emin misiniz?`);
+                          if (confirm) {
+                            clearPdfSlot(slotId);
+                          }
+                        } else {
+                          Alert.alert(
+                            'Dokümanı Sil',
+                            `"${slot.name}" belgesini silmek istediğinize emin misiniz?`,
+                            [
+                              { text: 'Vazgeç', style: 'cancel' },
+                              { text: 'Sil', style: 'destructive', onPress: () => clearPdfSlot(slotId) },
+                            ]
+                          );
+                        }
                       }}
                       activeOpacity={0.7}
                     >

@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert
+  StyleSheet, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
@@ -74,7 +74,11 @@ export const SmartIndexScreen: React.FC = () => {
 
   const handleSelectItem = async (concept: string) => {
     if (!apiKey) {
-      Alert.alert('API Anahtarı Gerekli', 'Akıllı özetler hazırlamak için önce Ayarlar ekranından API anahtarınızı girin.');
+      if (Platform.OS === 'web') {
+        window.alert('Akıllı özetler hazırlamak için önce Ayarlar ekranından API anahtarınızı girin.');
+      } else {
+        Alert.alert('API Anahtarı Gerekli', 'Akıllı özetler hazırlamak için önce Ayarlar ekranından API anahtarınızı girin.');
+      }
       return;
     }
 
@@ -93,7 +97,11 @@ export const SmartIndexScreen: React.FC = () => {
       setSummary(res);
     } catch (err: any) {
       console.error(err);
-      Alert.alert('Hata', 'Ders notu hazırlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+      if (Platform.OS === 'web') {
+        window.alert('Ders notu hazırlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+      } else {
+        Alert.alert('Hata', 'Ders notu hazırlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+      }
       setSelectedConcept(null);
     } finally {
       setLoading(false);

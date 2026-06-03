@@ -19,6 +19,7 @@ export interface QuizQuestion {
   };
   correct_answer: string;
   rational_explanation: string;
+  page_number?: number;
 }
 
 export interface Quiz {
