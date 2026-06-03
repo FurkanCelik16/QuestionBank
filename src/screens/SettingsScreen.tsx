@@ -41,7 +41,8 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   }, [apiKey]);
 
   const handleSave = async () => {
-    const trimmedKey = inputKey.trim();
+    // Sadece geçerli API anahtarı karakterlerini tut, görünmez mobil pano artıklarını ve boşlukları temizle
+    const trimmedKey = inputKey.replace(/[^a-zA-Z0-9-_]/g, '').trim();
     if (!trimmedKey) {
       Alert.alert('Uyarı', 'Lütfen bir API anahtarı girin.');
       return;

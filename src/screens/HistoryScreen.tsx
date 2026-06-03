@@ -45,6 +45,26 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
     ? Math.round(history.reduce((acc, curr) => acc + curr.result.scorePercentage, 0) / totalTests)
     : 0;
 
+  // Bugün çözülen soru sayısını hesaplama
+  const questionsSolvedToday = history.reduce((acc, curr) => {
+    const testDate = new Date(curr.date);
+    const today = new Date();
+    const isToday = testDate.getDate() === today.getDate() &&
+                    testDate.getMonth() === today.getMonth() &&
+                    testDate.getFullYear() === today.getFullYear();
+    return isToday ? acc + curr.result.totalQuestions : acc;
+  }, 0);
+
+  // Günlük ortalama çözülen soru sayısı (en az 1 test çözülen gün sayısına göre)
+  const activeDays = new Set(history.map(item => {
+    const d = new Date(item.date);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  })).size;
+
+  const dailyAverageQuestions = activeDays > 0
+    ? Math.round(totalQuestions / activeDays)
+    : 0;
+
   const handleTestPress = (item: TestHistoryItem) => {
     navigation.navigate('Result', { pastResult: item });
   };
@@ -112,6 +132,17 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           <View style={s.overviewItem}>
             <Text style={[s.overviewValue, { color: colors.success }]}>{totalCorrect}</Text>
             <Text style={s.overviewLabel}>Toplam Doğru</Text>
+          </View>
+        </View>
+        <View style={[s.overviewRow, s.overviewRowBottom]}>
+          <View style={s.overviewItem}>
+            <Text style={[s.overviewValue, { color: colors.warning }]}>{questionsSolvedToday}</Text>
+            <Text style={s.overviewLabel}>Bugün Çözülen</Text>
+          </View>
+          <View style={s.divider} />
+          <View style={s.overviewItem}>
+            <Text style={[s.overviewValue, { color: colors.accent }]}>{dailyAverageQuestions}</Text>
+            <Text style={s.overviewLabel}>Günlük Ortalama</Text>
           </View>
         </View>
       </View>

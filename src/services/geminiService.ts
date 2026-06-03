@@ -11,9 +11,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 const TIMEOUT_MS = 120000; // 120 seconds timeout for processing PDFs and generating 20 questions
 
 const DIFFICULTY_PROMPTS: Record<DifficultyLevel, string> = {
-  easy: 'KOLAY seviye: Temel bilgi gerektiren, doğrudan hatırlama ve tanıma düzeyinde sorular sor. Şıklar arasında belirgin farklar olsun.',
-  medium: 'ORTA seviye: KPSS sınavına uygun standart zorlukta, analiz ve yorumlama gerektiren sorular sor.',
-  hard: 'ZOR seviye: Derinlemesine bilgi, çıkarım ve sentez gerektiren sorular sor. Şıklar birbirine yakın olsun, dikkatli okuma gereksin.',
+  easy: 'KOLAY seviye: Yalnızca temel kavramsal yorumlama, mantık yürütme ve paragrafı/metni anlama (yorum) düzeyinde sorular sor. Kesinlikle ezbere dayalı derin tarih/coğrafya bilgisi sorma. Şıklar arasında çok belirgin ve net farklar olsun, çeldiriciler çok kolay elenebilsin.',
+  medium: 'ORTA seviye: Hem doğrudan temel bilgi hem de yorumlamayı dengeli bir şekilde bir arada ölçen (yorum-bilgi karışık) standart KPSS zorluğunda sorular sor. Çeldiriciler makul düzeyde seçici olsun.',
+  hard: 'ZOR seviye (ÖSYM Tarzı): ÖSYM sınav formatına uygun olarak; sorduğun temel kavram, olay veya olguyu doğrudan isim vererek sormak yerine, onu çevreleyen 2 ya da 3 adet yan bilgi/ipucu (örneğin olayın gerçekleştiği tarih, ilgili bir antlaşma, etkili olan bir komutan veya yer şekli gibi yan bilgiler) ile tanımlayarak ve betimleyerek sor. Şıklar ve çeldiriciler birbirine çok yakın olsun, derinlemesine bilgi ve dikkatli okuma gerektirsin.',
   extreme: 'UZMAN / AKADEMİK seviye: Son derece detaylı, derin akademik bilgi, karmaşık kavramsal analiz ve çok ince ayrıntı farkı gerektiren, en seçici adayları bile zorlayacak ileri düzey uzmanlık soruları sor. Şıklar birbirine o kadar yakın ve çeldiriciler o kadar profesyonelce hazırlanmış olsun ki, aday konuyu genel hatlarıyla bilse bile soruyu çözemesin, mutlaka dipnot seviyesinde en uç detaya hakim olması gereksin. Doğrudan ezber yerine, kavramlar arası sebep-sonuç ilişkilerini ve ince hukuki/idari/ekonomik ayrıntıları ölç.'
 };
 
@@ -56,53 +56,63 @@ async function fetchGeminiWithFallback(
   apiKey: string,
   responseMimeType?: string
 ): Promise<any> {
-  const modelsToTry = [preferredModel, 'gemini-1.5-flash', 'gemini-2.5-flash'];
+  const modelsToTry = [preferredModel, 'gemini-3.1-flash-lite', 'gemini-1.5-flash'];
   const uniqueModels = Array.from(new Set(modelsToTry.filter(Boolean)));
-  
+
   let lastError: any = null;
-  
+
   for (const model of uniqueModels) {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    
+
     // Copy the requestBody so we don't mutate the original
     const bodyCopy = JSON.parse(JSON.stringify(requestBody));
-    
+
     if (responseMimeType) {
       bodyCopy.generationConfig = bodyCopy.generationConfig || {};
       bodyCopy.generationConfig.responseMimeType = responseMimeType;
     }
-    
+
     try {
+      console.log(`[Diagnostic] fetchGeminiWithFallback - Model: ${model}, Key length: ${apiKey ? apiKey.length : 0}, Prefix: ${apiKey ? apiKey.substring(0, 6) : 'N/A'}..., Suffix: ...${apiKey ? apiKey.substring(apiKey.length - 4) : 'N/A'}`);
       console.log(`Gemini API çağrılıyor. Model: ${model}`);
       const res = await fetch(`${geminiUrl}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyCopy),
       });
-      
+
       if (res.ok) {
         return await res.json();
       }
-      
+
       const errorData = await res.json().catch(() => null);
       const message = errorData?.error?.message || `HTTP ${res.status}`;
       console.warn(`Model ${model} hatası: ${message} (Status: ${res.status})`);
-      
+
       lastError = new Error(message);
-      
-      if (res.status === 401 || res.status === 403) {
-        throw new Error('API anahtarı geçersiz veya yetkisiz. Lütfen anahtarınızı kontrol edin.');
+
+      if (res.status === 403 && (
+        message.toLowerCase().includes('permission to access') ||
+        message.toLowerCase().includes('may not exist') ||
+        message.toLowerCase().includes('files/') ||
+        message.toLowerCase().includes('not found')
+      )) {
+        throw new Error(`PDF_EXPIRED: Seçtiğiniz PDF belgesinin sunucudaki 48 saatlik süresi dolmuş veya dosya bulunamadı.\n\nDetay: ${message}`);
       }
-      
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(`API anahtarı geçersiz veya yetkisiz.\n\n[Tanı Bilgisi]:\n- Model: ${model}\n- Anahtar Uzunluğu: ${apiKey ? apiKey.length : 0} karakter\n- İlk/Son Harfler: ${apiKey ? apiKey.substring(0, 6) : ''}...${apiKey ? apiKey.substring(apiKey.length - 4) : ''}\n- Google Sunucu Mesajı: ${message}\n- HTTP Kodu: ${res.status}`);
+      }
+
     } catch (err: any) {
       console.warn(`Model ${model} çağrılırken istisna oluştu:`, err.message);
       lastError = err;
-      if (err.message.includes('API anahtarı geçersiz')) {
+      if (err.message.includes('API anahtarı geçersiz') || err.message.includes('PDF_EXPIRED')) {
         throw err;
       }
     }
   }
-  
+
   throw lastError || new Error('Gemini API bağlantı hatası.');
 }
 
@@ -128,7 +138,7 @@ export async function generateQuiz(
     throw new Error('En az bir konu seçmelisiniz veya bir PDF dokümanı yüklemelisiniz.');
   }
 
-  const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-3.1-flash-lite';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
   const topicsString = topics.join(', ');
@@ -215,13 +225,13 @@ KRİTİK DOKÜMANA SADAKAT KURALI (MÜFREDAT VE DIŞ BİLGİ YASAĞI):
 2. Soracağın her bir sorunun cevabı, şıkları ve tüm detayları BİREBİR ve YALNIZCA sana iletilen PDF dokümanının içinde yazıyor olmalıdır.
 3. PDF dokümanında geçmeyen hiçbir tarihi olayı, coğrafi detayı, kanunu veya bilgiyi (müfredatta yer alsa dahi) kesinlikle soruya dönüştürme.
 
-${topics.length > 0 
-  ? `KRİTİK KONU SINIRLANDIRMA KURALI:
+${topics.length > 0
+      ? `KRİTİK KONU SINIRLANDIRMA KURALI:
 - Yalnızca şu seçilen konular hakkında soru üret: [${topicsString}].
 - PDF dokümanı içinde geçiyor olsa dahi, bu listede yer almayan diğer hiçbir konudan/üniteden kesinlikle soru üretme! Sadece bu konularla ilgili sayfaları ve paragrafları tarayıp soru yaz.`
-  : `KONU SINIRLANDIRMA KURALI:
+      : `KONU SINIRLANDIRMA KURALI:
 - Herhangi bir konu kısıtlaması yoktur. PDF dokümanının tamamını tarayarak soruları dengeli bir şekilde üret.`
-}
+    }
 
 ÖNEMLİ PDF DERİN DETAY VE BİLGİ MADENCİLİĞİ TALİMATI (SON DERECE KRİTİK):
 1. Dokümanın sadece ilk sayfalarıyla veya genel tanımların geçtiği giriş kısımlarıyla sınırlı kalma. Belgenin ortalarındaki, sonlarındaki sayfaları da tam olarak oku ve analiz et.
@@ -241,14 +251,14 @@ ${excludeInstruction}${extremeMandate}${mapInstructionToUse}
   const userPrompt = (pdfBase64 || pdfUri)
     ? `Sana verilen PDF dokümanını detaylıca analiz et.
 ${pdfPageRange ? `Sayfa Aralığı Kısıtlaması: Yalnızca [${pdfPageRange}] sayfaları arasını tara.` : ''}
-${topics.length > 0 
-  ? `Seçilen Konular: [${topicsString}] (Sadece bu konularla sınırlı kal!)` 
-  : 'Konu Kısıtlaması: Yok (Müfredatı tamamen unut ve sadece PDF içeriğini tara)'}
+${topics.length > 0
+      ? `Seçilen Konular: [${topicsString}] (Sadece bu konularla sınırlı kal!)`
+      : 'Konu Kısıtlaması: Yok (Müfredatı tamamen unut ve sadece PDF içeriğini tara)'}
 
 BU TEST İÇİN SIKILAŞTIRILMIŞ TALİMUTLAR:
-1. ${topics.length > 0 
-  ? `Yalnızca seçilen konularla [${topicsString}] sınırlı kalmak ve PDF içinden bu konuları bulmak üzere` 
-  : `Sadece ve sadece PDF belgesinin tamamından${pdfPageRange ? ` (özellikle belirtilen [${pdfPageRange}] sayfalarından)` : ''}`} ${questionCount} adet benzersiz KPSS sorusu üret.
+1. ${topics.length > 0
+      ? `Yalnızca seçilen konularla [${topicsString}] sınırlı kalmak ve PDF içinden bu konuları bulmak üzere`
+      : `Sadece ve sadece PDF belgesinin tamamından${pdfPageRange ? ` (özellikle belirtilen [${pdfPageRange}] sayfalarından)` : ''}`} ${questionCount} adet benzersiz KPSS sorusu üret.
 2. Dışarıdan veya genel müfredat havuzundan hiçbir ek bilgi ekleme.
 3. ${pdfVarietyAndCoverageMandate}
 4. ${excludeInstruction}
@@ -320,10 +330,10 @@ Her soruda "subtopic" alanı olsun.`;
                 id: { type: 'INTEGER' },
                 type: { type: 'STRING' },
                 question_text: { type: 'STRING' },
-                subtopic: { 
-                   type: 'STRING',
-                   description: 'Sorunun ölçtüğü çok spesifik, mikro konu başlığı veya kavram (örn: "Uygurlar Maniheizm Etkisi", "Heyelan Set Gölleri", "Kut\'ül Amare", "Sened-i İttifak"). Asla genel/büyük konu adları veya "Tarih", "Coğrafya" gibi genel kategoriler yazma!'
-                 },
+                subtopic: {
+                  type: 'STRING',
+                  description: 'Sorunun ölçtüğü çok spesifik, mikro konu başlığı veya kavram (örn: "Uygurlar Maniheizm Etkisi", "Heyelan Set Gölleri", "Kut\'ül Amare", "Sened-i İttifak"). Asla genel/büyük konu adları veya "Tarih", "Coğrafya" gibi genel kategoriler yazma!'
+                },
                 options: {
                   type: 'OBJECT',
                   properties: {
@@ -361,6 +371,7 @@ Her soruda "subtopic" alanı olsun.`;
     const maxRetries = 3;
 
     while (retries <= maxRetries) {
+      console.log(`[Diagnostic] generateQuiz - Model: ${modelName}, Key length: ${apiKey ? apiKey.length : 0}, Prefix: ${apiKey ? apiKey.substring(0, 6) : 'N/A'}..., Suffix: ...${apiKey ? apiKey.substring(apiKey.length - 4) : 'N/A'}`);
       response = await fetch(`${geminiUrl}?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -388,8 +399,15 @@ Her soruda "subtopic" alanı olsun.`;
 
       if (response?.status === 400) {
         throw new Error(`Geçersiz istek: ${errorMessage}`);
+      } else if (response?.status === 403 && (
+        errorMessage.toLowerCase().includes('permission to access') ||
+        errorMessage.toLowerCase().includes('may not exist') ||
+        errorMessage.toLowerCase().includes('files/') ||
+        errorMessage.toLowerCase().includes('not found')
+      )) {
+        throw new Error(`PDF_EXPIRED: Seçtiğiniz PDF belgesinin sunucudaki 48 saatlik süresi dolmuş veya dosya bulunamadı.\n\nDetay: ${errorMessage}`);
       } else if (response?.status === 401 || response?.status === 403) {
-        throw new Error('API anahtarı geçersiz veya yetkisiz. Lütfen anahtarınızı kontrol edin.');
+        throw new Error(`API anahtarı geçersiz veya yetkisiz.\n\n[Tanı Bilgisi]:\n- Model: ${modelName}\n- Anahtar Uzunluğu: ${apiKey ? apiKey.length : 0} karakter\n- İlk/Son Harfler: ${apiKey ? apiKey.substring(0, 6) : ''}...${apiKey ? apiKey.substring(apiKey.length - 4) : ''}\n- Google Sunucu Mesajı: ${errorMessage}\n- HTTP Kodu: ${response?.status}`);
       } else if (response?.status === 429) {
         throw new Error('Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin.');
       } else if (response?.status && response.status >= 500) {
@@ -430,10 +448,11 @@ Her soruda "subtopic" alanı olsun.`;
       throw new Error('API yanıtında sorular bulunamadı. Lütfen tekrar deneyin.');
     }
 
-    // Validate each question
+    // Validate each question - Generate a globally unique timestamp-based ID to prevent collisions in Mistake Resolver (Hata Defteri)
+    const uniqueBaseId = Date.now();
     quiz.questions = quiz.questions.map((q: any, index: number) => {
       const question: QuizQuestion = {
-        id: q.id || index + 1,
+        id: uniqueBaseId + index,
         type: q.type || 'Çoktan Seçmeli',
         question_text: q.question_text || '',
         subtopic: q.subtopic || '',
@@ -459,12 +478,6 @@ Her soruda "subtopic" alanı olsun.`;
 
       return cleanQuestionPlakas(question);
     });
-
-    // Ensure unique IDs
-    quiz.questions = quiz.questions.map((q, index) => ({
-      ...q,
-      id: index + 1,
-    }));
 
     if (!quiz.test_id) {
       quiz.test_id = `test_${Date.now()}`;
@@ -644,7 +657,7 @@ export async function generateSimilarQuestion(
     throw new Error('API anahtarı bulunamadı.');
   }
 
-  const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-3.1-flash-lite';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
   const systemPrompt = `Sen KPSS alanında uzman, efsanevi bir soru hazırlayıcısın.
@@ -735,6 +748,7 @@ Lütfen JSON formatında ve tam olarak şu şemaya uygun bir nesne dön:
   }
 
   const similarQuestion = JSON.parse(textResponse) as QuizQuestion;
+  similarQuestion.id = Date.now();
   return cleanQuestionPlakas(similarQuestion);
 }
 
@@ -752,7 +766,7 @@ export async function generateSmartIndexSummary(
     throw new Error('API anahtarı bulunamadı.');
   }
 
-  const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-3.1-flash-lite';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
   const systemPrompt = `Sen KPSS hazırlık alanında efsaneleşmiş, milyonlarca öğrenciye Türkiye derecesi yaptırmış uzman bir KPSS hocasısın.
@@ -836,7 +850,7 @@ export async function generateTimelineEventDetail(
     throw new Error('API anahtarı bulunamadı. Lütfen Ayarlar ekranından API anahtarınızı girin.');
   }
 
-  const modelName = useSettingsStore.getState().geminiModel || 'gemini-2.5-flash';
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-3.1-flash-lite';
   const systemPrompt = `Sen son derece deneyimli, Türkiye'nin en iyi KPSS Tarih öğretmenisin.
 Görevin, kullanıcının seçtiği tarihi olay hakkında harikulade, nokta atışı ve ÖSYM tarzı zengin bir ders notu/bilgi kartı hazırlamaktır.
 
@@ -895,13 +909,13 @@ export function cleanPlakaFromText(text: string): string {
   if (!text) return '';
   // Clean plural lists like [8, 25, 36] numaralı alanlarda / illerde
   let cleaned = text.replace(/\[\d+(?:\s*,\s*\d+)*\]\s*numaralı\s*(?:il(?:imiz|ler|lerin|leri|lerden)?|alan(?:lar|larda|lardan)?|bölge(?:ler|lerde|lerden)?)/gi, 'işaretli yerler');
-  
+
   // Clean [8, 25, 36] numaralı
   cleaned = cleaned.replace(/\[\d+(?:\s*,\s*\d+)*\]\s*numaralı/gi, 'işaretli');
-  
+
   // Clean standalone [8, 25, 36]
   cleaned = cleaned.replace(/\[\d+(?:\s*,\s*\d+)*\]/gi, '');
-  
+
   // Clean single ones
   cleaned = cleaned.replace(/\[\d+\]\s*numaralı\s*il(?:imiz| olan)?\s*/gi, '');
   cleaned = cleaned.replace(/\[\d+\]\s*numaralı\s*/gi, '');

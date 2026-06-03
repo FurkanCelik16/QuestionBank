@@ -33,7 +33,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   apiKey: '',
   themeMode: 'dark', // Default theme
-  geminiModel: 'gemini-2.5-flash', // Default model
+  geminiModel: 'gemini-3.1-flash-lite', // Default model
   askedQuestions: [],
   isLoaded: false,
 
@@ -77,10 +77,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         const normalized = q.toLowerCase().trim();
         return !cleanedExisting.some(ex => ex.toLowerCase().trim() === normalized);
       });
-      
+
       // Combine and keep the most recent 100 concepts to avoid huge payload sizes
       const combined = [...uniqueNew, ...cleanedExisting].slice(0, 100);
-      
+
       await AsyncStorage.setItem(ASKED_QUESTIONS_STORAGE, JSON.stringify(combined));
       set({ askedQuestions: combined });
     } catch (error) {
@@ -105,7 +105,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         AsyncStorage.getItem(MODEL_STORAGE),
         AsyncStorage.getItem(ASKED_QUESTIONS_STORAGE),
       ]);
-      
+
       let parsedAsked: string[] = [];
       if (asked) {
         try {
@@ -117,13 +117,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
       // Automatically sanitize legacy history on boot to repair any broad/corrupt topics
       const cleanedAsked = cleanSubtopics(Array.isArray(parsedAsked) ? parsedAsked : []);
-      
-      set({ 
-        apiKey: key || '', 
+
+      set({
+        apiKey: key || '',
         themeMode: (theme as ThemeMode) || 'dark',
-        geminiModel: model || 'gemini-2.5-flash',
+        geminiModel: model || 'gemini-3.1-flash-lite',
         askedQuestions: cleanedAsked,
-        isLoaded: true 
+        isLoaded: true
       });
     } catch (error) {
       console.error('Ayarları yükleme hatası:', error);

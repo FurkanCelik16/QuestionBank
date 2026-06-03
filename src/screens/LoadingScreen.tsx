@@ -168,8 +168,99 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
       setQuestions(quiz.questions);
       navigation.replace('Quiz');
     } catch (error: any) {
-      setError(error.message || 'Bilinmeyen bir hata oluştu.');
-      const displayMsg = error.message || 'Beklenmedik bir hata oluştu. Lütfen API anahtarınızı ve internetinizi kontrol edin.';
+      // PDF Dosya Süresi Dolma / Silinme Hatası ve Otomatik İyileştirme (Auto-healing)
+      const isPdfExpired = error.message && (
+        error.message.includes('PDF_EXPIRED') ||
+        error.message.includes('permission to access the File') ||
+        error.message.includes('may not exist') ||
+        error.message.includes('files/') ||
+        error.message.includes('not found')
+      );
+
+      let canTryHealing = false;
+      if (isPdfExpired) {
+        if (finalBase64) {
+          canTryHealing = true;
+        } else if (pdfUri && Platform.OS !== 'web') {
+          try {
+            const FileSystem = require('expo-file-system');
+            const fileInfo = await FileSystem.getInfoAsync(pdfUri);
+            if (fileInfo.exists) {
+              canTryHealing = true;
+            }
+          } catch (e) {
+            console.warn('Check local file existence failed:', e);
+          }
+        }
+      }
+
+      let healed = false;
+      if (isPdfExpired && canTryHealing) {
+        try {
+          console.log('[Auto-Healing] PDF dosyasının süresi dolmuş veya silinmiş. Otomatik olarak yeniden yükleniyor...');
+          const { uploadToGeminiFiles } = require('../services/geminiService');
+          
+          // Re-upload the PDF to get a new active File URI
+          const newGeminiFileUri = await uploadToGeminiFiles(
+            finalBase64 || '',
+            pdfName || 'kpss_document.pdf',
+            apiKey,
+            Platform.OS !== 'web' ? pdfUri : null
+          );
+
+          if (newGeminiFileUri) {
+            console.log('[Auto-Healing] PDF başarıyla yeniden yüklendi. Yeni URI:', newGeminiFileUri);
+            
+            // Update the Zustand store and AsyncStorage with the new File URI
+            const quizStore = useQuizStore.getState();
+            quizStore.setPdfContext(pdfUri, finalBase64, pdfName, newGeminiFileUri);
+            
+            // If the PDF belongs to a specific slot, update the slot as well
+            if (quizStore.selectedSlotId) {
+              quizStore.uploadToPdfSlot(quizStore.selectedSlotId, pdfUri || '', finalBase64 || '', pdfName || '', newGeminiFileUri);
+            }
+
+            // Retry generating the quiz with the new active File URI
+            const quiz = await generateQuiz(
+              selectedTopics,
+              questionCount,
+              apiKey,
+              difficulty,
+              finalBase64,
+              askedQuestions,
+              newGeminiFileUri,
+              finalPageRange,
+              pdfName
+            );
+
+            if (quiz.questions) {
+              const newSubtopics = quiz.questions
+                .map((q) => q.subtopic || '')
+                .filter(Boolean);
+              if (newSubtopics.length > 0) {
+                await addAskedQuestions(newSubtopics);
+              }
+            }
+
+            setQuestions(quiz.questions);
+            healed = true;
+            navigation.replace('Quiz');
+            return; // Success! Exit early.
+          }
+        } catch (healingError: any) {
+          console.warn('[Auto-Healing] PDF yeniden yükleme başarısız oldu:', healingError.message);
+        }
+      }
+
+      // If we got here and it was a PDF expired error, it means we couldn't heal it because local files are missing
+      let displayMsg = error.message || 'Beklenmedik bir hata oluştu. Lütfen API anahtarınızı ve internetinizi kontrol edin.';
+      if (isPdfExpired && !healed) {
+        const expiredFriendlyError = 'Seçtiğiniz PDF belgesinin sunucudaki 48 saatlik süresi dolmuş veya cihazınızdaki geçici önbellek silinmiş.\n\nÇözüm: Lütfen ana sayfadaki "Kaynak Doküman Kütüphanesi" alanından bu belgeyi çöp kutusu simgesine basarak silin ve dosyayı cihazınızdan tekrar yükleyin.';
+        setError(expiredFriendlyError);
+        displayMsg = expiredFriendlyError;
+      } else {
+        setError(error.message || 'Bilinmeyen bir hata oluştu.');
+      }
       
       if (Platform.OS === 'web') {
         window.alert(`Test Oluşturulamadı!\n\nHata: ${displayMsg}`);
