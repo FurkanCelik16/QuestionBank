@@ -57,6 +57,7 @@ export interface TestHistoryItem {
   questionCount: number;
   difficulty: DifficultyLevel;
   result: QuizResult;
+  questions?: QuizQuestion[];
 }
 
 export interface Topic {

@@ -56,6 +56,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
       questionCount: questionCount,
       difficulty: difficulty,
       result: result,
+      questions: questions,
     });
     navigation.replace('Result');
   };

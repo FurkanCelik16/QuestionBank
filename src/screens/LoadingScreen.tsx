@@ -5,6 +5,7 @@ import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
 import { generateQuiz } from '../services/geminiService';
 import { useQuizStore } from '../store/useQuizStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useHistoryStore } from '../store/useHistoryStore';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { RouteProp } from '@react-navigation/native';
@@ -114,6 +115,34 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
     const { pdfBase64, geminiFileUri, pdfPageRange, pdfName, pdfUri } = useQuizStore.getState();
     const { askedQuestions, addAskedQuestions } = useSettingsStore.getState();
 
+    // Retrieve recent question texts from history to prevent duplicate/similar questions
+    const { history } = useHistoryStore.getState();
+    const recentQuestionTexts = history
+      .slice(0, 5) // Last 5 tests
+      .flatMap(h => {
+        const list: string[] = [];
+        if (h.questions) {
+          h.questions.forEach(q => {
+            if (q.question_text) list.push(q.question_text);
+          });
+        } else {
+          // Fallback for older test history
+          if (h.result.wrongAnswers) {
+            h.result.wrongAnswers.forEach(wa => {
+              if (wa.question?.question_text) list.push(wa.question.question_text);
+            });
+          }
+          if (h.result.emptyAnswers) {
+            h.result.emptyAnswers.forEach(ea => {
+              if (ea.question?.question_text) list.push(ea.question.question_text);
+            });
+          }
+        }
+        return list;
+      })
+      .filter(Boolean)
+      .slice(0, 40); // Keep max 40 question texts to avoid bloating the prompt
+
     // Dynamically calculate the final page range based on selected topics if pdfPageRange is not manually provided
     let finalPageRange = pdfPageRange;
     if (!finalPageRange && selectedTopics.length > 0) {
@@ -152,7 +181,8 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         askedQuestions,
         geminiFileUri,
         finalPageRange,
-        pdfName
+        pdfName,
+        recentQuestionTexts
       );
 
       // Save new question subtopics to local history
@@ -230,7 +260,8 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
               askedQuestions,
               newGeminiFileUri,
               finalPageRange,
-              pdfName
+              pdfName,
+              recentQuestionTexts
             );
 
             if (quiz.questions) {

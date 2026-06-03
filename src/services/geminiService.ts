@@ -128,7 +128,8 @@ export async function generateQuiz(
   excludeConcepts: string[] = [],
   pdfUri?: string | null,
   pdfPageRange?: string | null,
-  pdfName?: string | null
+  pdfName?: string | null,
+  excludeQuestionTexts: string[] = []
 ): Promise<Quiz> {
   if (!apiKey) {
     throw new Error('API anahtarı bulunamadı. Lütfen Ayarlar ekranından API anahtarınızı girin.');
@@ -161,6 +162,13 @@ export async function generateQuiz(
 Aşağıda belirtilen spesifik kavramlar/alt başlıklar hakkında daha önce sorular sorulmuştur. Bu nedenle, BU KAVRAMLARDAN VEYA BUNLARLA YAKINDAN İLGİLİ, EŞ ANLAMLI YA DA AYNI KONU GRUBUNDAKİ ALT DETAYLARDAN KESİNLİKLE TEKRAR SORU ÜRETME!
 Eğer yasaklı listede "Uygurlar Maniheizm" varsa, Uygurların dini inançlarıyla ilgili hiçbir şey sorma; onun yerine Uygurların tarım faaliyetleri, matbaası veya göç destanları gibi tamamen farklı alanlarına odaklan.
 [KESİNLİKLE YASAKLI / DAHA ÖNCE SORULAN KAVRAMLAR VE ALT BAŞLIKLAR]: ${cleanedExclusions.join(', ')}\n`
+    : '';
+
+  const excludeQuestionsInstruction = excludeQuestionTexts.length > 0
+    ? `\nÖNEMLİ (BENZER SORU ENGELLEME HAFIZASI - SON DERECE KRİTİK):
+Aşağıdaki sorular daha önce kullanıcıya sorulmuştur. Yeni üreteceğin soruların KESİNLİKLE bu sorularla aynı bilgiyi ölçmesine, benzer kurguda olmasına veya aynı soru kökünü/şık seçeneklerini kullanmasına İZİN VERİLMEMEKTEDİR! 
+Her bir yeni soru, aşağıdaki listede yer alan sorulardan tamamen farklı bir kurguya, bilgi odağına ve yaklaşıma sahip olmalıdır. Aynı konudan olsa bile farklı bir detayı sorgulamalıdır:
+${excludeQuestionTexts.map((q, idx) => `${idx + 1}. "${q.trim()}"`).join('\n')}\n`
     : '';
 
   const varietyAndCoverageMandate = `
@@ -237,14 +245,14 @@ ${topics.length > 0
 1. Dokümanın sadece ilk sayfalarıyla veya genel tanımların geçtiği giriş kısımlarıyla sınırlı kalma. Belgenin ortalarındaki, sonlarındaki sayfaları da tam olarak oku ve analiz et.
 2. Tablolardaki verileri, dipnotları, kıyıda köşede kalmış çok spesifik detayları, kanun maddelerini, isimleri, tarihleri ve en ince ayrıntıları özellikle tarayarak buralardan uzmanlık seviyesinde sorular üret.
 3. Genel geçer veya herkesin bildiği bilgiler yerine, dokümana has olan, derin KPSS/ÖSYM mantığına uygun ve adayları eleyecek nitelikte seçici detaylara odaklan.
-${excludeInstruction}${extremeMandate}${mapInstructionToUse}
+${excludeInstruction}${excludeQuestionsInstruction}${extremeMandate}${mapInstructionToUse}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`
     : `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${varietyAndCoverageMandate}
 MÜFREDAT BİLGİSİ:
 Aşağıdaki KPSS müfredatı detaylarını referans al ve YALNIZCA seçilen şu konular [${topicsString}] hakkında soru sor. Diğer konulara kesinlikle girme:
 ${syllabusContext}
-${excludeInstruction}${extremeMandate}${mapInstructionToUse}
+${excludeInstruction}${excludeQuestionsInstruction}${extremeMandate}${mapInstructionToUse}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`;
 
@@ -261,7 +269,8 @@ BU TEST İÇİN SIKILAŞTIRILMIŞ TALİMUTLAR:
       : `Sadece ve sadece PDF belgesinin tamamından${pdfPageRange ? ` (özellikle belirtilen [${pdfPageRange}] sayfalarından)` : ''}`} ${questionCount} adet benzersiz KPSS sorusu üret.
 2. Dışarıdan veya genel müfredat havuzundan hiçbir ek bilgi ekleme.
 3. ${pdfVarietyAndCoverageMandate}
-4. ${excludeInstruction}
+${excludeInstruction ? `4. ${excludeInstruction}` : ''}
+${excludeQuestionsInstruction ? `5. ${excludeQuestionsInstruction}` : ''}
 
 Her soruda "subtopic" alanı olsun.`
     : `Seçilen Konular: [${topicsString}]
@@ -269,7 +278,8 @@ Her soruda "subtopic" alanı olsun.`
 BU TEST İÇİN SIKILAŞTIRILMIŞ TALİMUTLAR:
 1. Seçilen konulardan ${questionCount} adet benzersiz KPSS sorusu üret.
 2. ${varietyAndCoverageMandate}
-3. ${excludeInstruction}
+${excludeInstruction ? `3. ${excludeInstruction}` : ''}
+${excludeQuestionsInstruction ? `4. ${excludeQuestionsInstruction}` : ''}
 
 Her soruda "subtopic" alanı olsun.`;
 
