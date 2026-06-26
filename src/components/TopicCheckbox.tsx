@@ -4,8 +4,9 @@ import {
   Text,
   StyleSheet,
   Animated,
+  View,
 } from 'react-native';
-import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 
 interface TopicCheckboxProps {
   label: string;
@@ -36,13 +37,13 @@ export const TopicCheckbox: React.FC<TopicCheckboxProps> = ({
   const handlePress = () => {
     Animated.sequence([
       Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 80,
+        toValue: 0.97,
+        duration: 50,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 4,
+        friction: 5,
         tension: 300,
         useNativeDriver: true,
       }),
@@ -51,89 +52,80 @@ export const TopicCheckbox: React.FC<TopicCheckboxProps> = ({
     onToggle();
   };
 
-  const accentColor = category === 'tarih' ? colors.tarih : colors.cografya;
-  const glowColor = category === 'tarih' ? colors.tarihGlow : colors.cografyaGlow;
-
-  const s = getStyles(colors);
+  const s = getStyles(colors, isSelected);
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+    <Animated.View style={[s.outer, { transform: [{ scale: scaleAnim }] }]}>
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.8}
-        style={[
-          s.container,
-          isSelected && {
-            borderColor: accentColor,
-            backgroundColor: glowColor,
-          },
-        ]}
+        style={s.container}
       >
+        {/* Content */}
+        <View style={s.content}>
+          <Text style={s.label} numberOfLines={2}>{label}</Text>
+        </View>
+
+        {/* Minimal Toggle indicator */}
         <Animated.View
           style={[
-            s.checkbox,
+            s.toggle,
             {
-              borderColor: isSelected ? accentColor : colors.border,
-              backgroundColor: isSelected ? accentColor : 'transparent',
-              transform: [
-                {
-                  scale: checkAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [1, 1.2, 1],
-                  }),
-                },
-              ],
+              transform: [{
+                scale: checkAnim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [1, 1.1, 1],
+                }),
+              }],
             },
           ]}
         >
-          {isSelected && (
-            <Text style={s.checkmark}>✓</Text>
-          )}
+          {isSelected && <Text style={s.checkmark}>✓</Text>}
         </Animated.View>
-        <Text
-          style={[
-            s.label,
-            isSelected && { color: colors.textPrimary },
-          ]}
-          numberOfLines={2}
-        >
-          {label}
-        </Text>
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: AppTheme, isSelected: boolean) => StyleSheet.create({
+  outer: {
+    marginBottom: spacing.sm,
+    borderRadius: borderRadius.md,
+    ...shadow(isSelected ? 2 : 0.5, colors.primary),
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: isSelected ? colors.primary : colors.border,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
   },
-  checkbox: {
+  content: {
+    flex: 1,
+  },
+  label: {
+    color: isSelected ? colors.textPrimary : colors.textSecondary,
+    fontSize: fontSize.sm + 1,
+    fontWeight: isSelected ? '800' : '600',
+    lineHeight: 20,
+  },
+  toggle: {
     width: 24,
     height: 24,
     borderRadius: borderRadius.sm,
     borderWidth: 2,
-    marginRight: spacing.md,
+    borderColor: isSelected ? colors.primary : colors.borderLight,
+    backgroundColor: isSelected ? colors.primary : 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: spacing.md,
   },
   checkmark: {
     color: colors.textInverse,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  label: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

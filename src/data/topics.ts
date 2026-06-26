@@ -28,13 +28,13 @@ export const topics: Topic[] = [
   { id: 'tarih_19', name: 'Küresel Sorunlar (S. 115)', category: 'tarih' },
 
   // ======== COĞRAFYA KONULARI ========
-  { id: 'cog_01', name: 'Türkiye’nin Coğrafi Konumu (S. 3-13)', category: 'cografya' },
-  { id: 'cog_02', name: 'Türkiye’nin Yerşekilleri (S. 23-42)', category: 'cografya' },
-  { id: 'cog_03', name: 'Türkiye’de İklim, Bitki Örtüsü ve Toprak Tipleri (S. 55-70)', category: 'cografya' },
-  { id: 'cog_04', name: 'Türkiye’de Nüfus ve Yerleşme (S. 85-97)', category: 'cografya' },
-  { id: 'cog_05', name: 'Türkiye’de Tarım ve Hayvancılık (S. 110-122)', category: 'cografya' },
-  { id: 'cog_06', name: 'Türkiye’de Madencilik ve Enerji Kaynakları (S. 132-141)', category: 'cografya' },
-  { id: 'cog_07', name: 'Türkiye’de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)', category: 'cografya' },
+  { id: 'cog_01', name: 'Türkiye\'nin Coğrafi Konumu (S. 3-13)', category: 'cografya' },
+  { id: 'cog_02', name: 'Türkiye\'nin Yerşekilleri (S. 23-42)', category: 'cografya' },
+  { id: 'cog_03', name: 'Türkiye\'de İklim, Bitki Örtüsü ve Toprak Tipleri (S. 55-70)', category: 'cografya' },
+  { id: 'cog_04', name: 'Türkiye\'de Nüfus ve Yerleşme (S. 85-97)', category: 'cografya' },
+  { id: 'cog_05', name: 'Türkiye\'de Tarım ve Hayvancılık (S. 110-122)', category: 'cografya' },
+  { id: 'cog_06', name: 'Türkiye\'de Madencilik ve Enerji Kaynakları (S. 132-141)', category: 'cografya' },
+  { id: 'cog_07', name: 'Türkiye\'de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)', category: 'cografya' },
 ];
 
 export const questionCountOptions = [5, 10, 15, 20];

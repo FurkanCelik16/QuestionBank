@@ -4,7 +4,7 @@ import {
   StyleSheet, Animated, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, borderRadius, spacing, fontSize, AppTheme } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, AppTheme, shadow } from '../theme/colors';
 import { useQuizStore } from '../store/useQuizStore';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { OptionButton } from '../components/OptionButton';
@@ -29,22 +29,36 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
   const question = getCurrentQuestion();
   const totalQuestions = questions.length;
   const progress = totalQuestions > 0 ? (currentIndex + 1) / totalQuestions : 0;
 
   useEffect(() => {
     fadeAnim.setValue(0);
-    slideAnim.setValue(20);
+    slideAnim.setValue(10);
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start();
   }, [currentIndex]);
 
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
+
   const handleSelectOption = (option: string) => {
     if (!question) return;
-    selectAnswer(question.id, option);
+    const currentAnswer = userAnswers[question.id];
+    if (currentAnswer === option) {
+      selectAnswer(question.id, '');
+    } else {
+      selectAnswer(question.id, option);
+    }
   };
 
   const completeQuiz = async () => {
@@ -104,35 +118,53 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const selectedAnswer = userAnswers[question.id];
   const s = getStyles(colors);
 
+  const widthInterpolate = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
-      {/* Top bar */}
+      {/* Top bar with clean flat background */}
       <View style={s.topBar}>
-        <TouchableOpacity onPress={handleQuit} style={s.quitBtn}>
+        <TouchableOpacity onPress={handleQuit} style={s.quitBtn} activeOpacity={0.8}>
           <Text style={s.quitText}>✕</Text>
         </TouchableOpacity>
         <View style={s.progressInfo}>
-          <Text style={s.progressText}>Soru {currentIndex + 1}/{totalQuestions}</Text>
+          <Text style={s.progressText}>Soru {currentIndex + 1} / {totalQuestions}</Text>
         </View>
         <View style={s.answeredBadge}>
-          <Text style={s.answeredText}>Çözülen: {getAnsweredCount()}</Text>
+          <Text style={s.answeredText}>{getAnsweredCount()} / {totalQuestions} Yanıtlandı</Text>
         </View>
       </View>
 
-      {/* Progress bar */}
-      <View style={s.progressBarBg}>
-        <Animated.View style={[s.progressBarFill, { width: `${progress * 100}%` }]} />
+      {/* Minimal progress bar */}
+      <View style={s.progressWrapper}>
+        <View style={s.progressBarBg}>
+          <Animated.View style={[s.progressBarFill, { width: widthInterpolate }]} />
+        </View>
       </View>
 
-      {/* Question */}
+      {/* Question scroll container */}
       <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          
+          {/* Flat Minimalist Question Card (No Generic Gradients) */}
           <View style={s.questionCard}>
             <View style={s.qTypeRow}>
-              <Text style={s.qType}>{question.type || 'Çoktan Seçmeli'}</Text>
+              <View style={s.qTypeBadge}>
+                <Text style={s.qType}>{question.type || 'ÇOKTAN SEÇMELİ'}</Text>
+              </View>
+              {difficulty && (
+                <View style={s.difficultyBadge}>
+                  <Text style={s.difficultyText}>
+                    {difficulty === 'easy' ? 'Kolay' : difficulty === 'medium' ? 'Orta' : difficulty === 'hard' ? 'Zor' : 'Uzman'}
+                  </Text>
+                </View>
+              )}
             </View>
             
-            {/* RENDER INLINE TURKEY MAP FOR MAP-BASED GEOGRAPHY QUESTIONS */}
+            {/* INLINE TURKEY MAP */}
             {question.highlighted_province_ids && question.highlighted_province_ids.length > 0 && (
               <View style={s.mapWrapper}>
                 <TurkeyMapSvg highlightedProvinceIds={question.highlighted_province_ids} />
@@ -142,7 +174,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={s.questionText}>{question.question_text}</Text>
           </View>
 
-          {/* Options */}
+          {/* Options list */}
           <View style={s.optionsContainer}>
             {(['A', 'B', 'C', 'D', 'E'] as const).map((opt) => (
               <OptionButton
@@ -157,83 +189,299 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
         </Animated.View>
       </ScrollView>
 
-      {/* Navigation buttons */}
+      {/* Elegant Action Buttons */}
       <View style={s.navRow}>
         <TouchableOpacity
           style={[s.navBtn, isFirstQuestion() && s.navBtnDisabled]}
           onPress={previousQuestion}
           disabled={isFirstQuestion()}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
           <Text style={[s.navBtnText, isFirstQuestion() && s.navBtnTextDisabled]}>← Geri</Text>
         </TouchableOpacity>
 
         {isLastQuestion() ? (
-          <TouchableOpacity style={s.finishBtn} onPress={handleFinish} activeOpacity={0.8}>
-            <Text style={s.finishBtnText}>Testi Bitir ✓</Text>
+          <TouchableOpacity style={s.finishBtn} onPress={handleFinish} activeOpacity={0.9}>
+            <Text style={s.finishBtnText}>Sınavı Bitir ✓</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={s.nextBtn} onPress={nextQuestion} activeOpacity={0.7}>
+          <TouchableOpacity style={s.nextBtn} onPress={nextQuestion} activeOpacity={0.8}>
             <Text style={s.nextBtnText}>İleri →</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Question dots */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.dotsScroll} contentContainerStyle={s.dotsContainer}>
-        {questions.map((q, i) => (
-          <TouchableOpacity
-            key={q.id}
-            style={[
-              s.dot,
-              i === currentIndex && s.dotActive,
-              userAnswers[q.id] && s.dotAnswered,
-              i === currentIndex && userAnswers[q.id] && s.dotActiveAnswered,
-            ]}
-            onPress={() => useQuizStore.getState().goToQuestion(i)}
-          >
-            <Text style={[s.dotText, i === currentIndex && s.dotTextActive]}>{i + 1}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Dot indicators */}
+      <View style={s.dotsWrapper}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dotsContainer}>
+          {questions.map((q, i) => {
+            const isCurrent = i === currentIndex;
+            const isAnswered = !!userAnswers[q.id];
+            
+            return (
+              <TouchableOpacity
+                key={q.id}
+                style={[
+                  s.dot,
+                  isCurrent && s.dotActive,
+                  isAnswered && s.dotAnswered,
+                  isCurrent && isAnswered && s.dotActiveAnswered,
+                ]}
+                onPress={() => useQuizStore.getState().goToQuestion(i)}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  s.dotText, 
+                  isCurrent && s.dotTextActive,
+                  isAnswered && !isCurrent && { color: colors.textPrimary }
+                ]}>
+                  {i + 1}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
 
 const getStyles = (colors: AppTheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  quitBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  quitText: { color: colors.textSecondary, fontSize: 16, fontWeight: '600' },
-  progressInfo: { flex: 1, alignItems: 'center' },
-  progressText: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700' },
-  answeredBadge: { backgroundColor: colors.primaryGlow, borderRadius: borderRadius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.primary },
-  answeredText: { color: colors.primary, fontSize: fontSize.xs, fontWeight: '700' },
-  progressBarBg: { height: 4, backgroundColor: colors.surface, marginHorizontal: spacing.lg, borderRadius: 2, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
-  scrollArea: { flex: 1 },
-  scrollContent: { padding: spacing.xxl, paddingTop: spacing.lg },
-  questionCard: { backgroundColor: colors.surface, borderRadius: borderRadius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, marginBottom: spacing.xl },
-  mapWrapper: { height: 180, width: '100%', marginVertical: spacing.md, borderRadius: borderRadius.md, overflow: 'hidden', backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border },
-  qTypeRow: { marginBottom: spacing.md },
-  qType: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  questionText: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '600', lineHeight: 28 },
-  optionsContainer: {},
-  navRow: { flexDirection: 'row', paddingHorizontal: spacing.xxl, paddingVertical: spacing.md, gap: spacing.sm },
-  navBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  navBtnDisabled: { opacity: 0.4 },
-  navBtnText: { color: colors.textSecondary, fontSize: fontSize.md, fontWeight: '600' },
-  navBtnTextDisabled: { color: colors.textMuted },
-  nextBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.primary },
-  nextBtnText: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
-  finishBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.primary },
-  finishBtnText: { color: colors.textInverse, fontSize: fontSize.md, fontWeight: '700' },
-  dotsScroll: { maxHeight: 44, borderTopWidth: 1, borderTopColor: colors.border },
-  dotsContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.xs },
-  dot: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  dotActive: { borderColor: colors.primary, borderWidth: 2 },
-  dotAnswered: { backgroundColor: colors.primaryGlow, borderColor: colors.primaryGlow },
-  dotActiveAnswered: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dotText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
-  dotTextActive: { color: colors.textInverse },
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.background 
+  },
+  topBar: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: spacing.lg, 
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceElevated,
+    borderBottomWidth: 1.5,
+    borderColor: colors.border,
+  },
+  quitBtn: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: borderRadius.sm, 
+    backgroundColor: colors.surface, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 1.5, 
+    borderColor: colors.border 
+  },
+  quitText: { 
+    color: colors.textPrimary, 
+    fontSize: 12, 
+    fontWeight: '900' 
+  },
+  progressInfo: { 
+    flex: 1, 
+    alignItems: 'center' 
+  },
+  progressText: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.md - 1, 
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  answeredBadge: { 
+    backgroundColor: colors.surfaceHighlight, 
+    borderRadius: borderRadius.sm, 
+    paddingHorizontal: spacing.md, 
+    paddingVertical: 5, 
+    borderWidth: 1, 
+    borderColor: colors.border 
+  },
+  answeredText: { 
+    color: colors.textSecondary, 
+    fontSize: fontSize.xs - 1, 
+    fontWeight: '800' 
+  },
+  progressWrapper: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    backgroundColor: colors.surfaceElevated,
+  },
+  progressBarBg: { 
+    height: 4, 
+    backgroundColor: colors.backgroundAlt, 
+    borderRadius: borderRadius.full, 
+    overflow: 'hidden' 
+  },
+  progressBarFill: { 
+    height: '100%', 
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary,
+  },
+  scrollArea: { 
+    flex: 1 
+  },
+  scrollContent: { 
+    padding: spacing.xl, 
+    paddingTop: spacing.lg 
+  },
+  questionCard: { 
+    backgroundColor: colors.surfaceElevated, 
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md, 
+    padding: spacing.xl, 
+    marginBottom: spacing.lg,
+    ...shadow(1),
+  },
+  qTypeRow: { 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md 
+  },
+  qTypeBadge: {
+    backgroundColor: colors.surfaceHighlight,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  qType: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.xxs + 1, 
+    fontWeight: '800', 
+    letterSpacing: 0.5 
+  },
+  difficultyBadge: {
+    backgroundColor: colors.surfaceHighlight,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  difficultyText: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xxs + 1,
+    fontWeight: '800',
+  },
+  mapWrapper: { 
+    height: 180, 
+    width: '100%', 
+    marginVertical: spacing.md, 
+    borderRadius: borderRadius.md, 
+    overflow: 'hidden', 
+    backgroundColor: colors.background, 
+    borderWidth: 1, 
+    borderColor: colors.border 
+  },
+  questionText: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.lg - 1, 
+    fontWeight: '800', 
+    lineHeight: 25,
+    letterSpacing: -0.3,
+  },
+  optionsContainer: {
+    gap: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  navRow: { 
+    flexDirection: 'row', 
+    paddingHorizontal: spacing.xl, 
+    paddingVertical: spacing.md, 
+    gap: spacing.md,
+    backgroundColor: colors.surfaceElevated,
+    borderTopWidth: 1.5,
+    borderColor: colors.border,
+  },
+  navBtn: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    height: 48, 
+    borderRadius: borderRadius.md, 
+    backgroundColor: colors.surface, 
+    borderWidth: 1.5, 
+    borderColor: colors.border 
+  },
+  navBtnDisabled: { 
+    opacity: 0.3 
+  },
+  navBtnText: { 
+    color: colors.textSecondary, 
+    fontSize: fontSize.sm + 1, 
+    fontWeight: '800' 
+  },
+  navBtnTextDisabled: { 
+    color: colors.textMuted 
+  },
+  nextBtn: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    height: 48, 
+    borderRadius: borderRadius.md, 
+    backgroundColor: colors.surface, 
+    borderWidth: 1.5, 
+    borderColor: colors.primary 
+  },
+  nextBtnText: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.sm + 1, 
+    fontWeight: '700' 
+  },
+  finishBtn: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    height: 48, 
+    borderRadius: borderRadius.md, 
+    backgroundColor: colors.primary,
+    ...shadow(3, colors.primaryDark),
+  },
+  finishBtnText: { 
+    color: colors.textInverse, 
+    fontSize: fontSize.sm + 1, 
+    fontWeight: '900' 
+  },
+  dotsWrapper: {
+    backgroundColor: colors.surfaceElevated,
+    borderTopWidth: 1,
+    borderColor: colors.borderSubtle,
+    height: 48,
+    justifyContent: 'center',
+  },
+  dotsContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: spacing.xl, 
+    gap: spacing.sm 
+  },
+  dot: { 
+    width: 28, 
+    height: 28, 
+    borderRadius: borderRadius.sm, 
+    backgroundColor: colors.surface, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 1.5, 
+    borderColor: colors.border 
+  },
+  dotActive: { 
+    borderColor: colors.primary, 
+    borderWidth: 2,
+    backgroundColor: colors.surfaceHighlight,
+  },
+  dotAnswered: { 
+    backgroundColor: colors.surfaceHighlight, 
+    borderColor: colors.border,
+  },
+  dotActiveAnswered: { 
+    backgroundColor: colors.primary, 
+    borderColor: colors.primary 
+  },
+  dotText: { 
+    color: colors.textMuted, 
+    fontSize: fontSize.xs - 1, 
+    fontWeight: '800' 
+  },
+  dotTextActive: { 
+    color: colors.textInverse 
+  },
 });

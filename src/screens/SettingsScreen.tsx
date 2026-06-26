@@ -1,8 +1,3 @@
-// ========================================
-// Settings Screen
-// API Key management and App Theme
-// ========================================
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -17,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, spacing, borderRadius, fontSize } from '../theme/colors';
+import { useTheme, spacing, borderRadius, fontSize, shadow, AppTheme } from '../theme/colors';
 import { useSettingsStore, ThemeMode } from '../store/useSettingsStore';
 
 const modelOptions = [
@@ -41,7 +36,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   }, [apiKey]);
 
   const handleSave = async () => {
-    // Sadece geçerli API anahtarı karakterlerini tut, görünmez mobil pano artıklarını ve boşlukları temizle
     const trimmedKey = inputKey.replace(/[^a-zA-Z0-9-_]/g, '').trim();
     if (!trimmedKey) {
       if (Platform.OS === 'web') {
@@ -106,7 +100,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   };
 
   const handleClearMemory = () => {
-    const totalCount = askedQuestions.length + seenQuestionTexts.length;
     const msg = `Daha önce sorulan soruların geçmişi (${askedQuestions.length} kavram, ${seenQuestionTexts.length} soru metni) silinecektir. Yapay zeka aynı soruları tekrar sorabilir. Emin misiniz?`;
     if (Platform.OS === 'web') {
       const confirm = window.confirm(msg);
@@ -146,162 +139,167 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header icon */}
-          <View style={styles.iconContainer}>
-            <Text style={styles.icon}>⚙️</Text>
-          </View>
-
-          <Text style={styles.title}>Uygulama Ayarları</Text>
-
-          {/* Theme Selection */}
-          <Text style={styles.sectionTitle}>Görünüm</Text>
-          <View style={styles.themeRow}>
-            <TouchableOpacity
-              style={[styles.themeOption, themeMode === 'light' && styles.themeOptionActive]}
-              onPress={() => handleThemeChange('light')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.themeEmoji}>☀️</Text>
-              <Text style={[styles.themeText, themeMode === 'light' && styles.themeTextActive]}>
-                Açık Tema
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.themeOption, themeMode === 'dark' && styles.themeOptionActive]}
-              onPress={() => handleThemeChange('dark')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.themeEmoji}>🌙</Text>
-              <Text style={[styles.themeText, themeMode === 'dark' && styles.themeTextActive]}>
-                Koyu Tema
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Model Selection */}
-          <Text style={styles.sectionTitle}>Yapay Zeka Modeli</Text>
-          <Text style={styles.subtitle}>
-            Test üretiminde kullanılacak modeli seçin. Limit dolumu yaşarsanız farklı bir model tercih edebilirsiniz.
-          </Text>
-          <View style={styles.modelContainer}>
-            {modelOptions.map((model) => (
+          {/* Theme selection card */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Görünüm</Text>
+            <View style={styles.themeRow}>
               <TouchableOpacity
-                key={model.key}
-                style={[
-                  styles.modelOption,
-                  geminiModel === model.key && styles.modelOptionActive,
-                ]}
-                onPress={() => handleModelChange(model.key)}
+                style={[styles.themeOption, themeMode === 'light' && styles.themeOptionActive]}
+                onPress={() => handleThemeChange('light')}
                 activeOpacity={0.8}
               >
-                <View style={styles.modelHeaderRow}>
-                  <Text style={styles.modelEmoji}>{model.emoji}</Text>
-                  <Text style={[
-                    styles.modelName,
-                    geminiModel === model.key && styles.modelTextActive,
-                  ]}>
-                    {model.label}
-                  </Text>
-                </View>
-                <Text style={styles.modelDesc}>{model.description}</Text>
+                <Text style={styles.themeEmoji}>☀️</Text>
+                <Text style={[styles.themeText, themeMode === 'light' && styles.themeTextActive]}>
+                  Açık Tema
+                </Text>
               </TouchableOpacity>
-            ))}
+
+              <TouchableOpacity
+                style={[styles.themeOption, themeMode === 'dark' && styles.themeOptionActive]}
+                onPress={() => handleThemeChange('dark')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.themeEmoji}>🌙</Text>
+                <Text style={[styles.themeText, themeMode === 'dark' && styles.themeTextActive]}>
+                  Koyu Tema
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Soru Hafızası Section */}
-          <Text style={styles.sectionTitle}>Soru Hafızası (Tekrar Engelleme)</Text>
-          <Text style={styles.subtitle}>
-            Gemini'nin aynı konuları tekrar sormasını engellemek için son çözdüğün {askedQuestions.length} kavram ve {seenQuestionTexts.length} soru metni hafızada tutuluyor.
-          </Text>
-          <View style={styles.memoryContainer}>
-            <TouchableOpacity
-              style={[styles.memoryButton, (askedQuestions.length === 0 && seenQuestionTexts.length === 0) && styles.memoryButtonDisabled]}
-              onPress={handleClearMemory}
-              disabled={askedQuestions.length === 0 && seenQuestionTexts.length === 0}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.memoryButtonText}>Hafızayı Temizle</Text>
-            </TouchableOpacity>
+          {/* Model selection card */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Yapay Zeka Sınav Modeli</Text>
+            <Text style={styles.subtitle}>
+              Soru üretimi ve analiz aşamalarında kullanılacak olan Gemini model sürümünü seçin.
+            </Text>
+            <View style={styles.modelContainer}>
+              {modelOptions.map((model) => {
+                const isSelected = geminiModel === model.key;
+                return (
+                  <TouchableOpacity
+                    key={model.key}
+                    style={[
+                      styles.modelOption,
+                      isSelected && styles.modelOptionActive,
+                    ]}
+                    onPress={() => handleModelChange(model.key)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.modelHeaderRow}>
+                      <Text style={styles.modelEmoji}>{model.emoji}</Text>
+                      <Text style={[
+                        styles.modelName,
+                        isSelected && styles.modelTextActive,
+                      ]}>
+                        {model.label}
+                      </Text>
+                    </View>
+                    <Text style={[styles.modelDesc, isSelected && { color: colors.textInverse }]}>
+                      {model.description}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
-          {/* API Key Section */}
-          <Text style={styles.sectionTitle}>Gemini API Anahtarı</Text>
-          <Text style={styles.subtitle}>
-            Testler oluşturmak için Google AI Studio'dan aldığınız Gemini API anahtarınızı girin.
-          </Text>
+          {/* API key configuration card */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Gemini API Anahtarı</Text>
+            <Text style={styles.subtitle}>
+              Testleri üretmek için Google AI Studio'dan aldığınız ücretsiz API anahtarınızı girin.
+            </Text>
 
-          {/* Info card */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
-            <Text style={styles.infoText}>
-              API anahtarınız yalnızca cihazınızda saklanır ve hiçbir sunucuya gönderilmez.
-              Anahtarı{' '}
-              <Text style={styles.infoLink}>
-                aistudio.google.com
+            {/* Flat Info Box */}
+            <View style={styles.infoCard}>
+              <Text style={styles.infoIcon}>🛡️</Text>
+              <Text style={styles.infoText}>
+                API anahtarınız sadece kendi cihazınızda saklanır. Anahtarınızı{' '}
+                <Text style={styles.infoLink}>aistudio.google.com</Text> adresinden tamamen ücretsiz olarak saniyeler içinde oluşturabilirsiniz.
               </Text>
-              {' '}adresinden ücretsiz edinebilirsiniz.
-            </Text>
+            </View>
+
+            {/* Input Wrapper */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={inputKey}
+                onChangeText={setInputKey}
+                placeholder="AIzaSy..."
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry={!showKey}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => setShowKey(!showKey)}
+                style={styles.eyeButton}
+              >
+                <Text style={styles.eyeIcon}>{showKey ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Save Button */}
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSave}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.saveButtonText}>Anahtarı Kaydet</Text>
+            </TouchableOpacity>
+
+            {/* Success notification banner */}
+            {saved && (
+              <Animated.View style={[styles.savedBanner, { opacity: fadeAnim }]}>
+                <Text style={styles.savedText}>✓ API anahtarı başarıyla güncellendi!</Text>
+              </Animated.View>
+            )}
+
+            {/* Clear Button */}
+            {apiKey ? (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={handleClear}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.clearButtonText}>API Anahtarını Cihazdan Sil</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Connection Status Row */}
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: apiKey ? colors.success : colors.error },
+                ]}
+              />
+              <Text style={styles.statusText}>
+                {apiKey ? 'API Bağlantısı Etkin' : 'API Bağlantısı Yok'}
+              </Text>
+            </View>
           </View>
 
-          {/* Input */}
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              value={inputKey}
-              onChangeText={setInputKey}
-              placeholder="AIza..."
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry={!showKey}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              onPress={() => setShowKey(!showKey)}
-              style={styles.eyeButton}
-            >
-              <Text style={styles.eyeIcon}>{showKey ? '🙈' : '👁️'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Save button */}
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSave}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>Anahtarı Kaydet</Text>
-          </TouchableOpacity>
-
-          {/* Saved indicator */}
-          {saved && (
-            <Animated.View style={[styles.savedBanner, { opacity: fadeAnim }]}>
-              <Text style={styles.savedText}>✓ Ayarlar kaydedildi!</Text>
-            </Animated.View>
-          )}
-
-          {/* Clear button */}
-          {apiKey ? (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={handleClear}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.clearButtonText}>API Anahtarını Sil</Text>
-            </TouchableOpacity>
-          ) : null}
-
-          {/* Status */}
-          <View style={styles.statusRow}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: apiKey ? colors.success : colors.error },
-              ]}
-            />
-            <Text style={styles.statusText}>
-              {apiKey ? 'API anahtarı aktif' : 'API anahtarı girilmedi'}
+          {/* Soru Hafızası Card */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Soru Hafızası</Text>
+            <Text style={styles.subtitle}>
+              Sistem, son çözdüğünüz {askedQuestions.length} alt başlığı ve {seenQuestionTexts.length} soru metnini aklında tutarak benzer soruların üretilmesini engeller.
             </Text>
+            <View style={styles.memoryContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.memoryButton, 
+                  (askedQuestions.length === 0 && seenQuestionTexts.length === 0) && styles.memoryButtonDisabled
+                ]}
+                onPress={handleClearMemory}
+                disabled={askedQuestions.length === 0 && seenQuestionTexts.length === 0}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.memoryButtonText}>Belleği Temizle</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -309,7 +307,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -318,33 +316,27 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: spacing.xxl,
-    paddingTop: spacing.lg,
+    padding: spacing.xl,
+    gap: spacing.lg,
   },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  icon: {
-    fontSize: 48,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: fontSize.xxl,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: spacing.xl,
+  sectionCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    ...shadow(1, colors.primary),
   },
   sectionTitle: {
     color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    marginBottom: spacing.md,
+    letterSpacing: -0.5,
   },
   themeRow: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginBottom: spacing.xxl,
   },
   themeOption: {
     flex: 1,
@@ -352,30 +344,29 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md - 3,
     gap: spacing.sm,
   },
   themeOptionActive: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryGlow,
+    backgroundColor: colors.primary,
   },
   modelContainer: {
     gap: spacing.sm,
-    marginBottom: spacing.xxl,
   },
   modelOption: {
     backgroundColor: colors.surface,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
     padding: spacing.md,
   },
   modelOptionActive: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryGlow,
+    backgroundColor: colors.primary,
   },
   modelHeaderRow: {
     flexDirection: 'row',
@@ -387,59 +378,64 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
   },
   modelName: {
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
-    fontWeight: '700',
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
   },
   modelTextActive: {
-    color: colors.primary,
+    color: colors.textInverse,
+    fontWeight: '900',
   },
   modelDesc: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: fontSize.xs,
     lineHeight: 16,
+    fontWeight: '600',
   },
   themeEmoji: {
-    fontSize: 18,
+    fontSize: 16,
   },
   themeText: {
     color: colors.textSecondary,
-    fontSize: fontSize.md,
-    fontWeight: '600',
+    fontSize: fontSize.sm - 1,
+    fontWeight: '700',
   },
   themeTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
+    color: colors.textInverse,
+    fontWeight: '900',
   },
   subtitle: {
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    lineHeight: 20,
+    fontSize: fontSize.xs + 1,
+    lineHeight: 18,
     marginBottom: spacing.md,
+    fontWeight: '600',
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.sm,
     padding: spacing.md,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSubtle,
   },
   infoIcon: {
-    fontSize: 16,
+    fontSize: 14,
     marginRight: spacing.sm,
-    marginTop: 2,
+    marginTop: 1,
   },
   infoText: {
     flex: 1,
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    lineHeight: 20,
+    color: colors.textMuted,
+    fontSize: fontSize.xs + 1,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   infoLink: {
-    color: colors.accent,
-    fontWeight: '600',
+    color: colors.textPrimary,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -453,86 +449,91 @@ const getStyles = (colors: any) => StyleSheet.create({
   input: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: fontSize.md,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: fontSize.sm,
+    paddingVertical: spacing.md - 2,
+    paddingHorizontal: spacing.md,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
   },
   eyeButton: {
     padding: spacing.md,
-    paddingRight: spacing.lg,
   },
   eyeIcon: {
-    fontSize: 20,
+    fontSize: 16,
   },
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.lg - 2,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    justifyContent: 'center',
+    height: 48,
+    ...shadow(3, colors.primaryDark),
   },
   saveButtonText: {
     color: colors.textInverse,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.sm + 1,
+    fontWeight: '900',
   },
   savedBanner: {
     backgroundColor: colors.successGlow,
     borderRadius: borderRadius.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.success,
     padding: spacing.md,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
   },
   savedText: {
     color: colors.success,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontSize: fontSize.xs + 1,
+    fontWeight: '800',
   },
   clearButton: {
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginBottom: spacing.xl,
+    paddingVertical: spacing.md - 3,
+    marginTop: spacing.sm,
   },
   clearButtonText: {
     color: colors.error,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontSize: fontSize.xs + 1,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   memoryContainer: {
-    marginBottom: spacing.xxl,
+    marginTop: spacing.xs,
   },
   memoryButton: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md - 3,
     alignItems: 'center',
   },
   memoryButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   memoryButtonText: {
     color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '700',
+    fontSize: fontSize.sm - 1,
+    fontWeight: '800',
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: spacing.md,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     marginRight: spacing.sm,
   },
   statusText: {
     color: colors.textMuted,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
   },
 });

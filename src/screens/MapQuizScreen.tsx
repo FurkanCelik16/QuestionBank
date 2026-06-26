@@ -26,11 +26,13 @@ export const MapQuizScreen: React.FC<Props> = ({ navigation }) => {
 
   // Sayaç yönetimi
   useEffect(() => {
+    if (!question) return;
+
     if (!answered && timeLeft > 0) {
       timerRef.current = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
     } else if (timeLeft === 0 && !answered) {
       // Süre bitti, yanlış sayılacak (veya boş) - şimdilik rastgele geçersiz bir şık seçmiş gibi yapalım
-      selectAnswer(question?.id || 0, 'TIMEOUT');
+      selectAnswer(question.id, 'TIMEOUT');
     }
 
     return () => {

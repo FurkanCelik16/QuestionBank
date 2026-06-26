@@ -50,13 +50,13 @@ interface QuizState {
   goToQuestion: (index: number) => void;
   setGenerating: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setPdfContext: (uri: string | null, base64: string | null, name: string | null, geminiUri?: string | null) => void;
-  clearPdfContext: () => void;
-  setPdfPageRange: (range: string | null) => void;
+  setPdfContext: (uri: string | null, base64: string | null, name: string | null, geminiUri?: string | null) => Promise<void>;
+  clearPdfContext: () => Promise<void>;
+  setPdfPageRange: (range: string | null) => Promise<void>;
   loadPdfContext: () => Promise<void>;
   selectPdfSlot: (slotId: string | null) => void;
-  uploadToPdfSlot: (slotId: string, uri: string, base64: string, name: string, geminiUri: string) => void;
-  clearPdfSlot: (slotId: string) => void;
+  uploadToPdfSlot: (slotId: string, uri: string, base64: string, name: string, geminiUri: string) => Promise<void>;
+  clearPdfSlot: (slotId: string) => Promise<void>;
   resetQuiz: () => void;
   resetQuizKeepTopics: () => void;
 
@@ -101,12 +101,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   },
 
   selectAnswer: (questionId, answer) => {
-    set((state) => ({
-      userAnswers: {
-        ...state.userAnswers,
-        [questionId]: answer,
-      },
-    }));
+    set((state) => {
+      const newAnswers = { ...state.userAnswers };
+      if (!answer) {
+        delete newAnswers[questionId];
+      } else {
+        newAnswers[questionId] = answer;
+      }
+      return { userAnswers: newAnswers };
+    });
   },
 
   nextQuestion: () => {
@@ -134,7 +137,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   setError: (error) => set({ error }),
 
-  setPdfContext: (uri, base64, name, geminiUri) => {
+  setPdfContext: async (uri, base64, name, geminiUri) => {
     set({ 
       pdfUri: uri, 
       pdfBase64: base64, 
@@ -142,40 +145,40 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       geminiFileUri: geminiUri || null 
     });
     try {
-      if (uri) AsyncStorage.setItem('@kpss_pdf_uri', uri);
-      else AsyncStorage.removeItem('@kpss_pdf_uri');
+      if (uri) await AsyncStorage.setItem('@kpss_pdf_uri', uri);
+      else await AsyncStorage.removeItem('@kpss_pdf_uri');
 
-      if (base64) AsyncStorage.setItem('@kpss_pdf_base_64', base64);
-      else AsyncStorage.removeItem('@kpss_pdf_base_64');
+      if (base64) await AsyncStorage.setItem('@kpss_pdf_base_64', base64);
+      else await AsyncStorage.removeItem('@kpss_pdf_base_64');
 
-      if (name) AsyncStorage.setItem('@kpss_pdf_name', name);
-      else AsyncStorage.removeItem('@kpss_pdf_name');
+      if (name) await AsyncStorage.setItem('@kpss_pdf_name', name);
+      else await AsyncStorage.removeItem('@kpss_pdf_name');
 
-      if (geminiUri) AsyncStorage.setItem('@kpss_gemini_file_uri', geminiUri);
-      else AsyncStorage.removeItem('@kpss_gemini_file_uri');
+      if (geminiUri) await AsyncStorage.setItem('@kpss_gemini_file_uri', geminiUri);
+      else await AsyncStorage.removeItem('@kpss_gemini_file_uri');
     } catch (e) {
       console.warn('Persist PDF error:', e);
     }
   },
 
-  clearPdfContext: () => {
+  clearPdfContext: async () => {
     set({ pdfUri: null, pdfBase64: null, pdfName: null, geminiFileUri: null, pdfPageRange: null });
     try {
-      AsyncStorage.removeItem('@kpss_pdf_uri');
-      AsyncStorage.removeItem('@kpss_pdf_base_64');
-      AsyncStorage.removeItem('@kpss_pdf_name');
-      AsyncStorage.removeItem('@kpss_gemini_file_uri');
-      AsyncStorage.removeItem('@kpss_pdf_page_range');
+      await AsyncStorage.removeItem('@kpss_pdf_uri');
+      await AsyncStorage.removeItem('@kpss_pdf_base_64');
+      await AsyncStorage.removeItem('@kpss_pdf_name');
+      await AsyncStorage.removeItem('@kpss_gemini_file_uri');
+      await AsyncStorage.removeItem('@kpss_pdf_page_range');
     } catch (e) {
       console.warn('Clear PDF persist error:', e);
     }
   },
 
-  setPdfPageRange: (range) => {
+  setPdfPageRange: async (range) => {
     set({ pdfPageRange: range });
     try {
-      if (range) AsyncStorage.setItem('@kpss_pdf_page_range', range);
-      else AsyncStorage.removeItem('@kpss_pdf_page_range');
+      if (range) await AsyncStorage.setItem('@kpss_pdf_page_range', range);
+      else await AsyncStorage.removeItem('@kpss_pdf_page_range');
     } catch (e) {
       console.warn('Persist PDF range error:', e);
     }
@@ -261,16 +264,16 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
     try {
       if (slotId) {
-        AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
+        await AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
       } else {
-        AsyncStorage.removeItem('@kpss_selected_slot_id');
+        await AsyncStorage.removeItem('@kpss_selected_slot_id');
       }
     } catch (e) {
       console.warn('Persist selected slot error:', e);
     }
   },
 
-  uploadToPdfSlot: (slotId, uri, base64, name, geminiUri) => {
+  uploadToPdfSlot: async (slotId, uri, base64, name, geminiUri) => {
     const { pdfSlots, selectedSlotId } = get();
     const updatedSlots = {
       ...pdfSlots,
@@ -303,16 +306,16 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         }
       });
 
-      AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(slotsForStorage));
+      await AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(slotsForStorage));
       if (shouldSelect) {
-        AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
+        await AsyncStorage.setItem('@kpss_selected_slot_id', slotId);
       }
     } catch (e) {
       console.warn('Persist upload slots error:', e);
     }
   },
 
-  clearPdfSlot: (slotId) => {
+  clearPdfSlot: async (slotId) => {
     const { pdfSlots, selectedSlotId } = get();
     const updatedSlots = {
       ...pdfSlots,
@@ -338,10 +341,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     }
 
     try {
-      AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(updatedSlots));
+      await AsyncStorage.setItem('@kpss_pdf_slots', JSON.stringify(updatedSlots));
       if (isCurrentSelected) {
-        AsyncStorage.removeItem('@kpss_selected_slot_id');
-        AsyncStorage.removeItem('@kpss_pdf_page_range');
+        await AsyncStorage.removeItem('@kpss_selected_slot_id');
+        await AsyncStorage.removeItem('@kpss_pdf_page_range');
       }
     } catch (e) {
       console.warn('Persist clear slot error:', e);

@@ -8,7 +8,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 import { QuizQuestion } from '../types';
 
 // Enable LayoutAnimation on Android
@@ -41,7 +41,7 @@ export const WrongAnswerCard: React.FC<WrongAnswerCardProps> = ({
   return (
     <TouchableOpacity
       onPress={toggleExpanded}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
       style={[
         s.container,
         { borderLeftColor: isEmpty ? colors.warning : colors.error },
@@ -49,18 +49,25 @@ export const WrongAnswerCard: React.FC<WrongAnswerCardProps> = ({
     >
       {/* Header */}
       <View style={s.header}>
-        <View style={s.questionBadge}>
-          <Text style={s.questionNumber}>S.{index + 1}</Text>
-        </View>
-        <View style={s.statusBadge}>
-          <Text
+        <View style={s.badgeRow}>
+          <View style={s.questionBadge}>
+            <Text style={s.questionNumber}>Soru {index + 1}</Text>
+          </View>
+          <View
             style={[
-              s.statusText,
-              { color: isEmpty ? colors.warning : colors.error },
+              s.statusBadge,
+              { backgroundColor: isEmpty ? colors.warningGlow : colors.errorGlow },
             ]}
           >
-            {isEmpty ? 'BOŞ' : 'YANLIŞ'}
-          </Text>
+            <Text
+              style={[
+                s.statusText,
+                { color: isEmpty ? colors.warning : colors.error },
+              ]}
+            >
+              {isEmpty ? 'BOŞ' : 'YANLIŞ'}
+            </Text>
+          </View>
         </View>
         <Text style={s.expandIcon}>{expanded ? '▲' : '▼'}</Text>
       </View>
@@ -75,39 +82,42 @@ export const WrongAnswerCard: React.FC<WrongAnswerCardProps> = ({
 
       {expanded && (
         <View style={s.details}>
-          {/* User's answer */}
-          {!isEmpty && (
-            <View style={s.answerRow}>
-              <Text style={s.answerLabel}>Senin Cevabın:</Text>
-              <View style={s.wrongBadge}>
-                <Text style={s.wrongBadgeText}>
-                  {userAnswer}) {question.options[userAnswer as keyof typeof question.options]}
+          {/* Answer Badges Grid */}
+          <View style={s.badgeGrid}>
+            {!isEmpty && (
+              <View style={s.badgeGridCol}>
+                <Text style={s.badgeGridLabel}>Senin Seçimin</Text>
+                <View style={s.wrongBadge}>
+                  <Text style={s.wrongBadgeText}>
+                    {userAnswer}) {question.options[userAnswer as keyof typeof question.options]}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View style={s.badgeGridCol}>
+              <Text style={s.badgeGridLabel}>Doğru Cevap</Text>
+              <View style={s.correctBadge}>
+                <Text style={s.correctBadgeText}>
+                  {question.correct_answer}) {question.options[question.correct_answer as keyof typeof question.options]}
                 </Text>
               </View>
             </View>
-          )}
-
-          {/* Correct answer */}
-          <View style={s.answerRow}>
-            <Text style={s.answerLabel}>Doğru Cevap:</Text>
-            <View style={s.correctBadge}>
-              <Text style={s.correctBadgeText}>
-                {question.correct_answer}) {question.options[question.correct_answer as keyof typeof question.options]}
-              </Text>
-            </View>
           </View>
 
-          {/* Explanation */}
+          {/* Explanation Section */}
           <View style={s.explanationContainer}>
-            <Text style={s.explanationTitle}>💡 Açıklama</Text>
+            <View style={s.explanationTitleRow}>
+              <Text style={s.explanationTitle}>💡 Açıklama ve Çözüm</Text>
+            </View>
             <Text style={s.explanationText}>
               {question.rational_explanation}
             </Text>
           </View>
 
-          {/* All options */}
+          {/* All Options list */}
           <View style={s.allOptions}>
-            <Text style={s.allOptionsTitle}>Tüm Şıklar:</Text>
+            <Text style={s.allOptionsTitle}>Seçeneklerin Tamamı</Text>
             {(['A', 'B', 'C', 'D', 'E'] as const).map((opt) => {
               const isCorrect = opt === question.correct_answer;
               const isUserWrong = opt === userAnswer && !isCorrect;
@@ -120,20 +130,28 @@ export const WrongAnswerCard: React.FC<WrongAnswerCardProps> = ({
                     isUserWrong && s.optionWrong,
                   ]}
                 >
-                  <Text
+                  <View
                     style={[
-                      s.optionLabel,
-                      isCorrect && { color: colors.success },
-                      isUserWrong && { color: colors.error },
+                      s.optionBadge,
+                      isCorrect && s.optionBadgeCorrect,
+                      isUserWrong && s.optionBadgeWrong,
                     ]}
                   >
-                    {opt})
-                  </Text>
+                    <Text
+                      style={[
+                        s.optionLabel,
+                        isCorrect && { color: colors.success },
+                        isUserWrong && { color: colors.error },
+                      ]}
+                    >
+                      {opt}
+                    </Text>
+                  </View>
                   <Text
                     style={[
                       s.optionText,
-                      isCorrect && { color: colors.success },
-                      isUserWrong && { color: colors.error },
+                      isCorrect && s.optionTextCorrect,
+                      isUserWrong && s.optionTextWrong,
                     ]}
                   >
                     {question.options[opt]}
@@ -150,156 +168,206 @@ export const WrongAnswerCard: React.FC<WrongAnswerCardProps> = ({
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderLeftWidth: 4,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  questionBadge: {
-    backgroundColor: colors.surfaceHighlight,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    marginRight: spacing.sm,
-  },
-  questionNumber: {
-    color: colors.textSecondary,
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    flex: 1,
-  },
-  statusText: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  expandIcon: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  questionText: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-  details: {
-    marginTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
-  },
-  answerRow: {
-    marginBottom: spacing.md,
-  },
-  answerLabel: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  wrongBadge: {
-    backgroundColor: colors.errorGlow,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.error,
-    padding: spacing.sm,
-  },
-  wrongBadgeText: {
-    color: colors.error,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-  },
-  correctBadge: {
-    backgroundColor: colors.successGlow,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.success,
-    padding: spacing.sm,
-  },
-  correctBadgeText: {
-    color: colors.success,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-  },
-  explanationContainer: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  explanationTitle: {
-    color: colors.accent,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  explanationText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    lineHeight: 22,
-  },
-  allOptions: {
-    marginTop: spacing.xs,
-  },
-  allOptionsTitle: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.sm,
-    marginBottom: 2,
-  },
-  optionCorrect: {
-    backgroundColor: colors.successGlow,
-  },
-  optionWrong: {
-    backgroundColor: colors.errorGlow,
-  },
-  optionLabel: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    width: 24,
-  },
-  optionText: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-  },
-  optionIcon: {
-    color: colors.success,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: spacing.sm,
-  },
-  optionIconWrong: {
-    color: colors.error,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: spacing.sm,
-  },
-});
+const getStyles = (colors: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: borderRadius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderLeftWidth: 3.5,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+      ...shadow(1, colors.primary),
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    questionBadge: {
+      backgroundColor: colors.surfaceHighlight,
+      borderRadius: borderRadius.xs,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+    },
+    questionNumber: {
+      color: colors.textPrimary,
+      fontSize: fontSize.xxs + 1,
+      fontWeight: '800',
+      letterSpacing: 0.2,
+    },
+    statusBadge: {
+      borderRadius: borderRadius.xs,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+    },
+    statusText: {
+      fontSize: fontSize.xxs + 1,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    expandIcon: {
+      color: colors.textMuted,
+      fontSize: 10,
+    },
+    questionText: {
+      color: colors.textPrimary,
+      fontSize: fontSize.md - 1,
+      lineHeight: 22,
+      fontWeight: '700',
+    },
+    details: {
+      marginTop: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderSubtle,
+      paddingTop: spacing.lg,
+    },
+    badgeGrid: {
+      flexDirection: 'column',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    badgeGridCol: {
+      flex: 1,
+    },
+    badgeGridLabel: {
+      color: colors.textMuted,
+      fontSize: fontSize.xxs + 1,
+      fontWeight: '700',
+      marginBottom: spacing.xs,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    wrongBadge: {
+      backgroundColor: colors.backgroundAlt,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md - 2,
+    },
+    wrongBadgeText: {
+      color: colors.error,
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+    },
+    correctBadge: {
+      backgroundColor: colors.backgroundAlt,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md - 2,
+    },
+    correctBadgeText: {
+      color: colors.success,
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+    },
+    explanationContainer: {
+      backgroundColor: colors.backgroundAlt,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    explanationTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginBottom: spacing.xs,
+    },
+    explanationTitle: {
+      color: colors.textPrimary,
+      fontSize: fontSize.sm,
+      fontWeight: '800',
+    },
+    explanationText: {
+      color: colors.textSecondary,
+      fontSize: fontSize.sm,
+      lineHeight: 20,
+      fontWeight: '500',
+    },
+    allOptions: {
+      marginTop: spacing.xs,
+    },
+    allOptionsTitle: {
+      color: colors.textMuted,
+      fontSize: fontSize.xxs + 1,
+      fontWeight: '700',
+      marginBottom: spacing.md,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: borderRadius.md,
+      marginBottom: spacing.xs,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    optionCorrect: {
+      backgroundColor: colors.successGlow,
+      borderColor: colors.success,
+    },
+    optionWrong: {
+      backgroundColor: colors.errorGlow,
+      borderColor: colors.error,
+    },
+    optionBadge: {
+      width: 24,
+      height: 24,
+      borderRadius: borderRadius.xs,
+      backgroundColor: colors.surfaceLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    optionBadgeCorrect: {
+      backgroundColor: 'rgba(15, 150, 107, 0.15)',
+    },
+    optionBadgeWrong: {
+      backgroundColor: 'rgba(222, 60, 82, 0.15)',
+    },
+    optionLabel: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: '800',
+    },
+    optionText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: fontSize.sm,
+      fontWeight: '500',
+    },
+    optionTextCorrect: {
+      color: colors.success,
+      fontWeight: '800',
+    },
+    optionTextWrong: {
+      color: colors.error,
+      fontWeight: '800',
+    },
+    optionIcon: {
+      color: colors.success,
+      fontSize: 14,
+      fontWeight: '900',
+      marginLeft: spacing.sm,
+    },
+    optionIconWrong: {
+      color: colors.error,
+      fontSize: 14,
+      fontWeight: '900',
+      marginLeft: spacing.sm,
+    },
+  });

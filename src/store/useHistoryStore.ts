@@ -9,6 +9,7 @@ import { TestHistoryItem } from '../types';
 
 const HISTORY_STORAGE_KEY = '@kpss_gemini_history';
 const SOLVED_WRONGS_KEY = '@kpss_gemini_solved_wrongs';
+const MAX_HISTORY_SIZE = 50; // Prevent unbounded AsyncStorage growth
 
 interface HistoryState {
   history: TestHistoryItem[];
@@ -30,9 +31,22 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   addTestResult: async (item: TestHistoryItem) => {
     try {
       const currentHistory = get().history;
-      const updatedHistory = [item, ...currentHistory]; // Newest first
+      // Limit history to MAX_HISTORY_SIZE to prevent AsyncStorage overflow
+      const updatedHistory = [item, ...currentHistory].slice(0, MAX_HISTORY_SIZE);
+
+      // Prune solvedWrongIds: remove IDs that no longer exist in any remaining history entry
+      const allWrongIds = new Set<number>();
+      updatedHistory.forEach(h => {
+        h.result.wrongAnswers.forEach(wa => allWrongIds.add(wa.question.id));
+      });
+      const currentSolved = get().solvedWrongIds;
+      const prunedSolved = currentSolved.filter(id => allWrongIds.has(id));
+
       await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
-      set({ history: updatedHistory });
+      if (prunedSolved.length !== currentSolved.length) {
+        await AsyncStorage.setItem(SOLVED_WRONGS_KEY, JSON.stringify(prunedSolved));
+      }
+      set({ history: updatedHistory, solvedWrongIds: prunedSolved });
     } catch (error) {
       console.error('Test geçmişi kaydetme hatası:', error);
     }

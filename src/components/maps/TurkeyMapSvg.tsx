@@ -79,13 +79,14 @@ export const TurkeyMapSvg: React.FC<TurkeyMapSvgProps> = ({ highlightedProvinceI
                   ? colors.surface 
                   : colors.surfaceLight;
                   
+              const isLightTheme = colors.background === '#FAF9F6';
               const strokeColor = isHighlighted 
                 ? colors.primaryLight 
                 : isCyprus 
                   ? colors.border 
-                  : colors.border;
+                  : (isLightTheme ? 'rgba(25, 25, 25, 0.24)' : 'rgba(255, 255, 255, 0.26)');
                   
-              const strokeWidth = isHighlighted ? 2.5 : 0.6;
+              const strokeWidth = isHighlighted ? 2.5 : 0.95;
               
               return prov.paths.map((pathD, idx) => {
                 const pathKey = `${prov.id}-${idx}`;

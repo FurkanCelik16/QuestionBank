@@ -68,7 +68,7 @@ export interface Topic {
 }
 
 export type RootStackParamList = {
-  TopicSelection: undefined;
+  TopicSelection: { initialTab?: 'tarih' | 'cografya' | 'harita' } | undefined;
   Loading: {
     selectedTopics: string[];
     questionCount: number;

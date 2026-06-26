@@ -75,7 +75,9 @@ async function fetchGeminiWithFallback(
     }
 
     try {
-      console.log(`[Diagnostic] fetchGeminiWithFallback - Model: ${model}, Key length: ${apiKey ? apiKey.length : 0}, Prefix: ${apiKey ? apiKey.substring(0, 6) : 'N/A'}..., Suffix: ...${apiKey ? apiKey.substring(apiKey.length - 4) : 'N/A'}`);
+      if (__DEV__) {
+        console.log(`[Diagnostic] fetchGeminiWithFallback - Model: ${model}, Key length: ${apiKey ? apiKey.length : 0}`);
+      }
       console.log(`Gemini API çağrılıyor. Model: ${model}`);
       const res = await fetch(`${geminiUrl}?key=${apiKey}`, {
         method: 'POST',
@@ -189,15 +191,7 @@ const TOPIC_TO_SYLLABUS_MAP: Record<string, string[]> = {
   "Türkiye'nin Coğrafi Konumu (S. 3-13)": [
     "Türkiye'nin İklimi"
   ],
-  "Türkiye’nin Coğrafi Konumu (S. 3-13)": [
-    "Türkiye'nin İklimi"
-  ],
   "Türkiye'nin Yerşekilleri (S. 23-42)": [
-    "Türkiye'nin Fiziki Coğrafyası (Yer Şekilleri)",
-    "Türkiye'nin Su Kaynakları (Akarsular, Göller)",
-    "Harita Bilgisi"
-  ],
-  "Türkiye’nin Yerşekilleri (S. 23-42)": [
     "Türkiye'nin Fiziki Coğrafyası (Yer Şekilleri)",
     "Türkiye'nin Su Kaynakları (Akarsular, Göller)",
     "Harita Bilgisi"
@@ -206,32 +200,16 @@ const TOPIC_TO_SYLLABUS_MAP: Record<string, string[]> = {
     "Türkiye'nin İklimi",
     "Türkiye'nin Bitki Örtüsü ve Toprak Yapısı"
   ],
-  "Türkiye’de İklim, Bitki Örtüsü ve Toprak Tipleri (S. 55-70)": [
-    "Türkiye'nin İklimi",
-    "Türkiye'nin Bitki Örtüsü ve Toprak Yapısı"
-  ],
   "Türkiye'de Nüfus ve Yerleşme (S. 85-97)": [
-    "Türkiye'de Nüfus ve Yerleşme"
-  ],
-  "Türkiye’de Nüfus ve Yerleşme (S. 85-97)": [
     "Türkiye'de Nüfus ve Yerleşme"
   ],
   "Türkiye'de Tarım ve Hayvancılık (S. 110-122)": [
     "Türkiye'nin Ekonomik Coğrafyası (Tarım)"
   ],
-  "Türkiye’de Tarım ve Hayvancılık (S. 110-122)": [
-    "Türkiye'nin Ekonomik Coğrafyası (Tarım)"
-  ],
   "Türkiye'de Madencilik ve Enerji Kaynakları (S. 132-141)": [
     "Türkiye'nin Ekonomik Coğrafyası (Sanayi ve Enerji)"
   ],
-  "Türkiye’de Madencilik ve Enerji Kaynakları (S. 132-141)": [
-    "Türkiye'nin Ekonomik Coğrafyası (Sanayi ve Enerji)"
-  ],
   "Türkiye'de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)": [
-    "Türkiye'nin Ekonomik Coğrafyası (Ulaşım ve Ticaret)"
-  ],
-  "Türkiye’de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)": [
     "Türkiye'nin Ekonomik Coğrafyası (Ulaşım ve Ticaret)"
   ]
 };
@@ -239,7 +217,7 @@ const TOPIC_TO_SYLLABUS_MAP: Record<string, string[]> = {
 function normalizeKey(str: string): string {
   return str
     .toLowerCase()
-    .replace(/’/g, "'")
+    .replace(/'/g, "'")
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -512,7 +490,7 @@ export async function generateQuiz(
   difficulty: DifficultyLevel = 'medium',
   pdfBase64?: string | null,
   excludeConcepts: string[] = [],
-  pdfUri?: string | null,
+  geminiFileUri?: string | null,
   pdfPageRange?: string | null,
   pdfName?: string | null,
   excludeQuestionTexts: string[] = []
@@ -521,7 +499,7 @@ export async function generateQuiz(
     throw new Error('API anahtarı bulunamadı. Lütfen Ayarlar ekranından API anahtarınızı girin.');
   }
 
-  if (topics.length === 0 && !pdfBase64 && !pdfUri) {
+  if (topics.length === 0 && !pdfBase64 && !geminiFileUri) {
     throw new Error('En az bir konu seçmelisiniz veya bir PDF dokümanı yüklemelisiniz.');
   }
 
@@ -549,7 +527,7 @@ export async function generateQuiz(
   const trimmedExcludeTexts = excludeQuestionTexts.slice(0, 40);
 
   // Generate the forced distribution plan (the core anti-clustering mechanism)
-  const isPdfMode = !!(pdfBase64 || pdfUri);
+  const isPdfMode = !!(pdfBase64 || geminiFileUri);
   
   let actualPageCount = 100;
   if (isPdfMode && pdfPageRange) {
@@ -592,6 +570,8 @@ export async function generateQuiz(
 6. GİRİŞ TARZI / ŞABLON METNİ KAÇAK ENGELİ: Dağılım planındaki "Giriş tarzı" yönergelerini (örn: "Doğrudan soru kökü ile başla", "Bir tarihi olayın sonuçlarını sorarak başla", "Bir alıntı veya tarihi ifade ile başla", "Kronolojik sıralama veya dönem karşılaştırması sor" vb.) KESİNLİKLE soru metninin ("question_text") içine kopyalama, ekleme veya başlık/ön ek olarak yazma! Bu ifadeler sadece sorunun kurgu mantığı için kılavuzdur. Sorunun kendisi doğrudan doğal bir cümle ile başlamalıdır.
 7. ALINTI/PARAGRAF BİLGİ KAÇAK YASAĞI (KENDİNDEN CEVAPLI SORU YASAĞI): Eğer alıntı vererek soruyorsan (örn: "Bir tarihçi ... demiştir"), sorunun doğru cevabını alıntının/paragrafın içerisine KESİNLİKLE yazma! Alıntı sadece bir bağlam veya ipucu vermelidir, sorunun cevabı ise bu bağlamdan hareketle bilgi kullanılarak çözülmelidir. Örneğin, içinde cevabı barındıran basit sorular (örn: "Bir tarihçi '...köylerin yöneticisi Muhtar olmuştur' demiştir. Buna göre bu dönemde köylerin yöneticisi kimdir?") KESİNLİKLE yasaktır.
 8. MİKRO KAVRAM HASSASİYETİ (SUBTOPIC KURALI): Ürettiğin her sorunun JSON çıktısındaki "subtopic" (alt konu) alanını son derece spesifik, benzersiz ve mikro düzeyde bir kavram olarak doldur (örn: "Osmanlı Devleti Kültür ve Uygarlığı" veya "Tarih" gibi genel ifadeler KESİNLİKLE yazma! Bunun yerine "Tereke Defteri", "Muaccele", "Sabuncuoğlu Şerefeddin", "Beşik Ulemalığı" gibi spesifik kavramı yaz). Bu alan, gelecekteki testlerde bu konunun tekrar sorulmasını engellemek için kullanılacaktır.
+9. MANTIK HATASI ENGELİ (YUKARIDAKİLERDEN HANGİSİ): Soru metni "Yukarıdakilerden hangisi..." veya "Buna göre..." diye başlıyor/bitiyorsa, metnin en üstünde MUTLAKA okunacak öncüller (I. ..., II. ..., III. ...) veya referans bir paragraf/bilgi bulunmak ZORUNDADIR. Eğer soru kökünün hemen üstünde okunacak bir öncül yoksa "Yukarıdakilerden hangisi" ifadesini ASLA kullanma, doğrudan "Aşağıdakilerden hangisi" diyerek sor.
+10. ÖNCÜLLÜ (I, II, III NUMARALI) SORULARDA MUTLAK KURAL: Eğer öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini KESİNLİKLE soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise SADECE "A) Yalnız I", "B) Yalnız II", "C) I ve II", "D) II ve III", "E) I, II ve III" gibi klasik kombinasyonlardan oluşmalıdır. KESİNLİKLE öncüllerin kendisini seçeneklerin (A, B, C, D, E) içine tek tek dağıtıp diğer şıkları da "I ve II doğrudur" şeklinde kurgulama! Bu durum soruyu mantıksız ve hatalı kılar.
 `;
 
   const pdfVarietyAndCoverageMandate = `
@@ -612,12 +592,21 @@ ${isNarrowRange
 8. ARD ARDA AYNI KONU YIĞILMA YASAĞI (KONU KARIŞTIRMA / SHUFFLE): Aynı konudan (örneğin toprak sistemi, divan üyeleri veya padişah ıslahatları) olan soruları KESİNLİKLE art arda sıralama! Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda 2 tane toprak sorusu veya 2 tane 17. yüzyıl sorusu çözmemelidir. Konular test geneline homojen olarak dağıtılmalıdır.
 9. GİRİŞ TARZI / ŞABLON METNİ KAÇAK ENGELİ: Dağılım planındaki "Giriş tarzı" yönergelerini (örn: "Doğrudan soru kökü ile başla", "Bir tarihi olayın sonuçlarını sorarak başla", "Bir alıntı veya tarihi ifade ile başla", "Kronolojik sıralama veya dönem karşılaştırması sor" vb.) KESİNLİKLE soru metninin ("question_text") içine kopyalama, ekleme veya başlık/ön ek olarak yazma! Bu ifadeler sadece sorunun kurgu mantığı için kılavuzdur. Sorunun kendisi doğrudan doğal bir cümle ile başlamalıdır.
 10. ALINTI/PARAGRAF BİLGİ KAÇAK YASAĞI (KENDİNDEN CEVAPLI SORU YASAĞI): Eğer alıntı vererek soruyorsan (örn: "Bir tarihçi ... demiştir"), sorunun doğru cevabını alıntının/paragrafın içerisine KESİNLİKLE yazma! Alıntı sadece bir bağlam veya ipucu vermelidir, sorunun cevabı ise bu bağlamdan hareketle bilgi kullanılarak çözülmelidir. Örneğin, içinde cevabı barındıran basit sorular (örn: "Bir tarihçi '...köylerin yöneticisi Muhtar olmuştur' demiştir. Buna göre bu dönemde köylerin yöneticisi kimdir?") KESİNLİKLE yasaktır.
+11. MANTIK HATASI ENGELİ (YUKARIDAKİLERDEN HANGİSİ): Soru metni "Yukarıdakilerden hangisi..." veya "Buna göre..." diye başlıyor/bitiyorsa, metnin en üstünde MUTLAKA okunacak öncüller (I. ..., II. ..., III. ...) veya referans bir paragraf/bilgi bulunmak ZORUNDADIR. Eğer soru kökünün hemen üstünde okunacak bir öncül yoksa "Yukarıdakilerden hangisi" ifadesini ASLA kullanma, doğrudan "Aşağıdakilerden hangisi" diyerek sor.
+12. ÖNCÜLLÜ (I, II, III NUMARALI) SORULARDA MUTLAK KURAL: Eğer öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini KESİNLİKLE soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise SADECE "A) Yalnız I", "B) Yalnız II", "C) I ve II", "D) II ve III", "E) I, II ve III" gibi klasik kombinasyonlardan oluşmalıdır. KESİNLİKLE öncüllerin kendisini seçeneklerin (A, B, C, D, E) içine tek tek dağıtıp diğer şıkları da "I ve II doğrudur" şeklinde kurgulama! Bu durum soruyu mantıksız ve hatalı kılar.
 `;
 
-  const speedConstraints = `
+  const explanationLength: Record<DifficultyLevel, string> = {
+  easy: '"rational_explanation" (açıklama) kısmını KESİNLİKLE maksimum 1-2 cümle ile son derece kısa ve öz tut, yalnızca cevabın neden doğru olduğunu açıkla.',
+  medium: '"rational_explanation" (açıklama) kısmını 2-3 cümle ile öz tut, cevabın neden doğru olduğunu ve yanlış şıkların neden yanlış olduğunu kısaca açıkla.',
+  hard: '"rational_explanation" (açıklama) kısmını 3-5 cümle ile detaylı bir şekilde yaz. Doğru cevabın neden doğru olduğunu, yanlış şıkların neden yanlış olduğunu ve konunun KPSS bağlamındaki önemini açıkla.',
+  extreme: '"rational_explanation" (açıklama) kısmını 3-5 cümle ile akademik düzeyde detaylı yaz. Doğru cevabın neden doğru olduğunu, her yanlış şıkkın neden yanlış olduğunu, kavramlar arası ince farkları ve ÖSYM tuzaklarını açıkla.'
+};
+
+const speedConstraints = `
 HIZ VE KALİTE TALİMATI:
 1. Soru metinlerini ve seçenekleri gereksiz yere uzatma. Net, açık ve doğrudan bir dil kullan.
-2. "rational_explanation" (açıklama) kısmını KESİNLİKLE maksimum 1-2 cümle ile son derece kısa ve öz tut, yalnızca cevabın neden doğru olduğunu açıkla. Konu anlatımı yapma.
+2. ${explanationLength[difficulty]}
 3. Sorularda her şık benzersiz olsun. Tekrarlayan ifadeler kullanma.
 `;
 
@@ -638,23 +627,26 @@ Bu test UZMAN / AKADEMİK seviyededir.
   const geographyMapInstruction = `
 [!!! COĞRAFYA HARİTALI SORU TALİMATI - SON DERECE KRİTİK VE MUTLAK ZORUNLU !!!]:
 Eğer Coğrafya konuları hakkında soru üretiyorsan, ürettiğin toplam soruların en az %30'unu (örn: 10 soruluk bir testte en az 3 soruyu) **Türkiye Haritalı Soru** olarak tasarla.
-1. Haritalı sorularda, haritada vurgulanmasını ve işaretlenmesini istediğin illerin plaka kodlarını (1-81 arası tamsayılar, örn: Rize için [53], Muğla için [48], Konya için [42], İzmir için [35]) "highlighted_province_ids" alanına bir dizi olarak ekle. (Haritasız normal sorularda bu alanı tamamen boş bırak veya ekleme).
-2. Soru metninde haritaya açıkça atıfta bulun. Örnek: "Yukarıdaki Türkiye haritasında koyu renkle işaretlenerek gösterilen ilimiz için aşağıdakilerden hangisi söylenemez?" ya da "Haritada işaretlenen bölgelerin ortak coğrafi özelliği aşağıdakilerden hangisidir?" gibi ifadeler kullan.
-3. ÇOK KRİTİK COĞRAFİ UYUMLULUK VE KURAL:
-   - "highlighted_province_ids" içine yazdığın plaka numaraları ile soru metninde ve çözüm açıklamasında (rational_explanation) kastedilen, bahsedilen iller coğrafi olarak %100 BİREBİR AYNI olmalıdır!
-   - KESİNLİKLE plaka numarası başka bir il (örn: 6-Ankara, 34-İstanbul) iken, soruda ve çözümde başka illeri (örn: Erzurum, Ardahan) kastederek saçma sapan açıklamalar yazma!
-   - Erzurum ve Kars'ı sormak istiyorsan, plaka kodları KESİNLİKLE [25, 36] olmalıdır. Ankara ve İstanbul'u sormak istiyorsan plaka kodları KESİNLİKLE [6, 34] olmalıdır.
-   - Soru kökünde, seçeneklerde veya çözümde kastedilen her bir ilin Türkiye plaka numarasını aklında doğru eşleştir ve "highlighted_province_ids" dizisini kusursuz bir doğrulukla doldur. Bu kuralın ihlali kesinlikle kabul edilemez bir coğrafi hatadır!
-   - YAZIM VE GÖSTERİM KURALI: Soru metninin (question_text), seçeneklerin (options) veya açıklamanın (rational_explanation) içerisine KESİNLİKLE "[6]", "[34]" veya "[6] ve [34] numaralı iller" gibi plaka kodlarını ham metin ya da parantez içinde SAYI olarak yazma! Haritada zaten bu iller koyu renkle boyalı/işaretli olacağı için soruda bunlardan bahsederken "haritada koyu renkle işaretlenen illerimiz", "işaretli merkezlerin ortak özelliği" gibi son derece doğal coğrafi ifadeler kullan. Plaka numaralarını metin içinde göstermek kesinlikle yasaktır!
+1. Haritalı sorularda, haritada vurgulanmasını ve işaretlenmesini istediğin illerin plaka kodlarını (1-81 arası tamsayılar, örn: Rize için [53]) "highlighted_province_ids" alanına SADECE INTEGER (Tamsayı) dizisi olarak ekle. KESİNLİKLE STRING ("53", "07") KULLANMA! (Haritasız normal sorularda bu alanı [] bırak).
+2. KRİTİK UI KISITLAMASI (DİKKAT!): Uygulamadaki harita motoru, "highlighted_province_ids" içine yazdığın illeri sadece KIRMIZIYA BOYAR. İllerin üzerine KESİNLİKLE numara (I, II, III vb.) veya harf YAZAMAZ.
+3. BU YÜZDEN ŞU SORU TİPİ KESİNLİKLE YASAKTIR: "Haritada numaralandırılmış alanların hangisinde..." deyip şıklara "A) I, B) II, C) III" koymak YASAKTIR. Şıklara il plakası "A) 34, B) 06" koymak YASAKTIR. Bu tür sorular uygulamada çözülemez ve testin kalitesini bozar.
+4. DOĞRU HARİTALI SORU TİPLERİ ŞUNLARDIR:
+   - TİP 1 (Tek İl İşaretli): Sadece 1 ilin plakasını "highlighted_province_ids" içine ekle. Soru: "Yukarıdaki haritada kırmızı renk ile gösterilen yörede aşağıdaki tarım ürünlerinden hangisi yetişmez?". Şıklar: "A) Pamuk, B) Fındık, C) Çay...".
+   - TİP 2 (Çoklu İl İşaretli): Birden fazla ilin plakasını ekle (örn: [53, 61, 08]). Soru: "Türkiye haritasında koyu renkle işaretlenen illerin ortak coğrafi özelliği aşağıdakilerden hangisidir?". Şıklar: "A) Dağların kıyıya dik uzanması, B) Yaz kuraklığının belirgin olması...".
+   - Harita kullanmadan "I ve II" öncüllü soru sormak serbesttir, ancak bu öncüller soru metni (question_text) içinde metin olarak yazılmalıdır.
+5. "highlighted_province_ids" içine yazdığın iller ile soru kökünde/çözümde kastedilen iller %100 uyuşmalıdır. (Örn: Soru Erzurum-Kars ise plakalar kesinlikle [25, 36] olmalıdır).
+6. Soru veya seçenek metnine KESİNLİKLE "[6]", "[34]" gibi plaka sayıları yazma, sadece doğal ifadeler kullan.
 `;
 
   const hasGeography = topics.some((t) => t.toLowerCase().includes('cog') || t.toLowerCase().includes('coğrafya') || t.toLowerCase().includes('cografya') || t.toLowerCase().includes('harita')) ||
     (pdfName && (pdfName.toLowerCase().includes('cografya') || pdfName.toLowerCase().includes('coğrafya') || pdfName.toLowerCase().includes('harita')));
   const mapInstructionToUse = hasGeography ? geographyMapInstruction : '';
 
-  const systemPrompt = (pdfBase64 || pdfUri)
+  const systemPrompt = (pdfBase64 || geminiFileUri)
     ? `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${pdfVarietyAndCoverageMandate}
 Sana verilen PDF dokümanını TEK VE MUTLAK KAYNAK olarak kullan. ${pageRangeInstruction}
+
+Lütfen çıktıyı SADECE geçerli bir JSON formatında ver. JSON objelerinin sonuna ASLA trailing comma (sondaki virgül) KOYMA.
 
 KRİTİK DOKÜMANA SADAKAT KURALI (MÜFREDAT VE DIŞ BİLGİ YASAĞI):
 1. Kendi eğitim verilerindeki veya dış dünyadaki genel KPSS müfredatı bilgilerini KESİNLİKLE KULLANMA!
@@ -664,7 +656,7 @@ KRİTİK DOKÜMANA SADAKAT KURALI (MÜFREDAT VE DIŞ BİLGİ YASAĞI):
 ${topics.length > 0
       ? `KRİTİK KONU SINIRLANDIRMA KURALI:
 - Yalnızca şu seçilen konular hakkında soru üret: [${topicsString}].
-- PDF dokümanı içinde geçiyor olsa dahi, bu listede yer almayan diğer hiçbir konudan/üniteden kesinlikle soru üretme! Sadece bu konularla ilgili sayfaları ve paragrafları tarayıp soru yaz.`
+- PDF dokümanı içinde geçiyor veya diğer sayfalarda yer alıyor olsa dahi, bu listede yer almayan diğer hiçbir konudan/üniteden (örneğin Osmanlı Devleti, İnkılap Tarihi vb. seçilmeyen diğer ünitelerden) KESİNLİKLE soru üretme! Sadece bu konularla doğrudan ilgili olan kısımları tarayıp soru yaz.`
       : `KONU SINIRLANDIRMA KURALI:
 - Herhangi bir konu kısıtlaması yoktur. PDF dokümanının tamamını tarayarak soruları dengeli bir şekilde üret.`
     }
@@ -679,16 +671,24 @@ ${distributionPlan}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`
     : `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${varietyAndCoverageMandate}
+Lütfen çıktıyı SADECE geçerli bir JSON formatında ver. JSON objelerinin sonuna ASLA trailing comma (sondaki virgül) KOYMA.
+
 MÜFREDAT BİLGİSİ:
 Aşağıdaki KPSS müfredatı detaylarını referans al ve YALNIZCA seçilen şu konular [${topicsString}] hakkında soru sor. Diğer konulara kesinlikle girme:
 ${syllabusContext}
+
+[!!! KRİTİK KONU VE DÖNEM SINIRLANDIRMA UYARISI !!!]:
+- Soracağın tüm soruları SADECE yukarıdaki "MÜFREDAT BİLGİSİ" alanında listelenmiş ve sana detayları verilen [${topicsString}] konusu/konuları ile sınırla.
+- Bu konunun/konuların dışındaki diğer hiçbir KPSS tarih konusuna (örneğin Osmanlı Devleti, İlk Türk İslam Devletleri, Selçuklular, II. Mahmut, İnkılap Tarihi, Çağdaş Tarih vb.) KESİNLİKLE DOKUNMA, TEK BİR SORU DAHİ SORMA!
+- Tüm sorular (örneğin 20 sorunun tamamı) sadece seçilen bu konulardan gelmek zorundadır. Farklı dönemlerin veya konuların sorularını araya kesinlikle karıştırma.
+
 ${extremeMandate}${mapInstructionToUse}
 
 ${distributionPlan}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`;
 
-  const userPrompt = (pdfBase64 || pdfUri)
+  const userPrompt = (pdfBase64 || geminiFileUri)
     ? `Sana verilen PDF dokümanını detaylıca analiz et.
 ${pdfPageRange ? `Sayfa Aralığı Kısıtlaması: Yalnızca [${pdfPageRange}] sayfaları arasını tara.` : ''}
 ${topics.length > 0
@@ -724,10 +724,10 @@ ${excludeQuestionsInstruction}`;
   const parts: any[] = [];
 
   // PRIORITIZE GEMINI FILES API CLOUD URI TO PREVENT HUGE BASE64 REST PAYLOADS AND TIMEOUTS
-  if (pdfUri && pdfUri.startsWith('https://generativelanguage.googleapis.com')) {
+  if (geminiFileUri && geminiFileUri.startsWith('https://generativelanguage.googleapis.com')) {
     parts.push({
       fileData: {
-        fileUri: pdfUri,
+        fileUri: geminiFileUri,
         mimeType: 'application/pdf',
       },
     });
@@ -738,10 +738,10 @@ ${excludeQuestionsInstruction}`;
         data: pdfBase64,
       },
     });
-  } else if (pdfUri) {
+  } else if (geminiFileUri) {
     parts.push({
       fileData: {
-        fileUri: pdfUri,
+        fileUri: geminiFileUri,
         mimeType: 'application/pdf',
       },
     });
@@ -757,9 +757,6 @@ ${excludeQuestionsInstruction}`;
         parts: parts,
       },
     ],
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
     generationConfig: {
       temperature: isPdfMode ? 0.75 : 0.80, // Raised to allow diversity; distribution plan enforces structure instead of temperature
       topP: 0.95,
@@ -823,7 +820,9 @@ ${excludeQuestionsInstruction}`;
     const maxRetries = 3;
 
     while (retries <= maxRetries) {
-      console.log(`[Diagnostic] generateQuiz - Model: ${modelName}, Key length: ${apiKey ? apiKey.length : 0}, Prefix: ${apiKey ? apiKey.substring(0, 6) : 'N/A'}..., Suffix: ...${apiKey ? apiKey.substring(apiKey.length - 4) : 'N/A'}`);
+      if (__DEV__) {
+        console.log(`[Diagnostic] generateQuiz - Model: ${modelName}, Key length: ${apiKey ? apiKey.length : 0}`);
+      }
       response = await fetch(`${geminiUrl}?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -876,7 +875,6 @@ ${excludeQuestionsInstruction}`;
       throw new Error('Gemini API boş yanıt döndü. Lütfen tekrar deneyin.');
     }
 
-    // Parse JSON from response - clean any markdown artifacts
     let cleanedText = textContent.trim();
     if (cleanedText.startsWith('```json')) {
       cleanedText = cleanedText.slice(7);
@@ -887,6 +885,16 @@ ${excludeQuestionsInstruction}`;
       cleanedText = cleanedText.slice(0, -3);
     }
     cleanedText = cleanedText.trim();
+
+    // Sanitize trailing commas which are common in AI JSON outputs and break JSON.parse
+    cleanedText = cleanedText.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+
+    // Strip everything before the first '{' and after the last '}' to handle garbage text
+    const firstBrace = cleanedText.indexOf('{');
+    const lastBrace = cleanedText.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleanedText = cleanedText.substring(firstBrace, lastBrace + 1);
+    }
 
     let quiz: Quiz;
     try {
@@ -926,6 +934,7 @@ ${excludeQuestionsInstruction}`;
       }
 
       if (!['A', 'B', 'C', 'D', 'E'].includes(question.correct_answer)) {
+        console.warn(`[Quiz Validation] Soru ${index + 1}: Geçersiz correct_answer "${question.correct_answer}", "A" olarak düzeltildi.`);
         question.correct_answer = 'A';
       }
 
@@ -1152,9 +1161,6 @@ Lütfen JSON formatında ve tam olarak şu şemaya uygun bir nesne dön:
         parts: [{ text: `[SİSTEM TALİMATI]:\n${systemPrompt}\n\n[TALEBİM]:\n${userPrompt}` }],
       },
     ],
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
     generationConfig: {
       temperature: 0.85,
       responseMimeType: 'application/json',
@@ -1213,7 +1219,7 @@ export async function generateSmartIndexSummary(
   category: 'tarih' | 'cografya',
   apiKey: string,
   pdfBase64?: string | null,
-  pdfUri?: string | null
+  geminiFileUri?: string | null
 ): Promise<string> {
   if (!apiKey) {
     throw new Error('API anahtarı bulunamadı.');
@@ -1243,10 +1249,10 @@ Markdown başlık yapısı şöyle olsun (Giriş yapmadan direkt bu başlıkla b
 Notun tamamı Türkçe, son derece akıcı, net, sınav odaklı ve akademik olarak %100 hatasız olmalıdır.`;
 
   const parts: any[] = [];
-  if (pdfUri) {
+  if (geminiFileUri) {
     parts.push({
       fileData: {
-        fileUri: pdfUri,
+        fileUri: geminiFileUri,
         mimeType: 'application/pdf',
       },
     });
@@ -1268,9 +1274,6 @@ Notun tamamı Türkçe, son derece akıcı, net, sınav odaklı ve akademik olar
         parts: parts,
       },
     ],
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
     generationConfig: {
       temperature: 0.8,
       maxOutputTokens: 4096,
@@ -1331,9 +1334,6 @@ Notun tamamı Türkçe, son derece akıcı, net, nokta atışı bilgi odaklı ve
         parts: [{ text: `[SİSTEM TALİMATI]:\n${systemPrompt}\n\n[TALEBİM]:\n${userPrompt}` }],
       },
     ],
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
     generationConfig: {
       temperature: 0.75,
       maxOutputTokens: 2048,

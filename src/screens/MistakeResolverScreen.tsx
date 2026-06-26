@@ -4,7 +4,7 @@
 // Supports dynamic AI-driven "Similar Question Generation" (Hata Takviyesi).
 // ========================================
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Platform, Alert, ActivityIndicator
@@ -41,6 +41,13 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
+
+  // Clamp currentIndex when wrongQuestions list shrinks (e.g., after solving a question)
+  useEffect(() => {
+    if (wrongQuestions.length > 0 && currentIndex >= wrongQuestions.length) {
+      setCurrentIndex(Math.max(0, wrongQuestions.length - 1));
+    }
+  }, [wrongQuestions.length, currentIndex]);
 
   // Similar question states
   const [similarQuestion, setSimilarQuestion] = useState<QuizQuestion | null>(null);
@@ -97,8 +104,12 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleNext = async () => {
+    // Capture current state before any async operations
+    const wasCorrect = selectedOption === currentQuestion?.correct_answer;
+    const wasSimilarQuestion = !!similarQuestion;
+
     // If correct and it was the base question (not similar question), mark it as solved
-    if (!similarQuestion && selectedOption === currentQuestion.correct_answer) {
+    if (!wasSimilarQuestion && wasCorrect && currentQuestion) {
       await markWrongAsSolved(currentQuestion.id);
     }
 
@@ -107,27 +118,40 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
     setIsAnswered(false);
     setSimilarQuestion(null); // Return to regular mistake flow
 
-    // If there is another question, advance
-    if (currentIndex < wrongQuestions.length - 1) {
-      Animated.sequence([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 15, duration: 1, useNativeDriver: true })
-      ]).start(() => {
-        // Only increment index if they didn't solve it correctly (since correctly solved shrinks the wrongQuestions list!)
-        if (selectedOption !== currentQuestion.correct_answer) {
-          setCurrentIndex(prev => Math.min(prev + 1, wrongQuestions.length - 2));
-        }
-        
-        Animated.parallel([
-          Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.spring(slideAnim, { toValue: 0, friction: 6, useNativeDriver: true })
-        ]).start();
-      });
-    } else {
-      if (selectedOption === currentQuestion.correct_answer) {
-        setCurrentIndex(0);
-      }
+    // After marking as solved, the wrongQuestions list will shrink on next render.
+    // If the user answered correctly (and it was the base question), the current item
+    // will be removed from the list, so we keep the same index (it will now point to
+    // the next item). If wrong, we need to increment the index.
+    const listWillShrink = !wasSimilarQuestion && wasCorrect;
+    const currentListLength = wrongQuestions.length;
+    const futureListLength = listWillShrink ? currentListLength - 1 : currentListLength;
+
+    if (futureListLength <= 0) {
+      // All questions solved — useEffect clamp + empty state render will handle it
+      setCurrentIndex(0);
+      return;
     }
+
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 15, duration: 1, useNativeDriver: true })
+    ]).start(() => {
+      if (listWillShrink) {
+        // List shrinks: keep index but clamp to new bounds
+        setCurrentIndex(prev => Math.min(prev, futureListLength - 1));
+      } else {
+        // List stays same size: advance index, wrapping to 0 at end
+        setCurrentIndex(prev => {
+          if (prev >= currentListLength - 1) return 0; // Wrap to start
+          return prev + 1;
+        });
+      }
+
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, friction: 6, useNativeDriver: true })
+      ]).start();
+    });
   };
 
   const handleQuit = () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 import { generateQuiz } from '../services/geminiService';
 import { useQuizStore } from '../store/useQuizStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -17,17 +17,16 @@ type Props = {
 };
 
 const motivationalMessages = [
-  'Gemini soruları hazırlıyor...',
-  'ÖSYM kalitesinde sorular üretiliyor...',
-  'Bilgi bankası taranıyor...',
-  'Sorular şekilleniyor...',
-  'Şıklar düzenleniyor...',
-  'Az kaldı, hazırlan!',
-  'Testine son dokunuşlar yapılıyor...',
+  'Yapay zeka sınav sorularını hazırlıyor...',
+  'ÖSYM soru standartları çözümleniyor...',
+  'Akıllı müfredat veri tabanı taranıyor...',
+  'Görsel harita ve soru şıkları harmanlanıyor...',
+  'Detaylı çözüm açıklamaları oluşturuluyor...',
+  'Sınav zorluk derecesi ayarlanıyor...',
+  'Sınavınız hazır olmak üzere, odaklanın!',
 ];
 
 const ALL_TOPIC_PAGES: Record<string, string> = {
-  // TARİH KONULARI
   tarih_01: '2-8',
   tarih_02: '9-18',
   tarih_03: '23-32',
@@ -48,7 +47,6 @@ const ALL_TOPIC_PAGES: Record<string, string> = {
   tarih_18: '109-114',
   tarih_19: '115',
 
-  // COĞRAFYA KONULARI
   cog_01: '3-13',
   cog_02: '23-42',
   cog_03: '55-70',
@@ -62,51 +60,53 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
   const { selectedTopics, questionCount, difficulty } = route.params;
   const { apiKey } = useSettingsStore();
   const { setQuestions, setError } = useQuizStore();
-  const [msgIndex, setMsgIndex] = useState(0);
+  
+  const [currentMsg, setCurrentMsg] = useState(motivationalMessages[0]);
   const colors = useTheme();
 
   const spinAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const dotAnim1 = useRef(new Animated.Value(0)).current;
-  const dotAnim2 = useRef(new Animated.Value(0)).current;
-  const dotAnim3 = useRef(new Animated.Value(0)).current;
+  const fadeOpacity = useRef(new Animated.Value(1)).current;
+  const progressPercent = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Spin animation
     Animated.loop(
       Animated.timing(spinAnim, {
-        toValue: 1, duration: 2000, easing: Easing.linear, useNativeDriver: true,
+        toValue: 1, duration: 1800, easing: Easing.linear, useNativeDriver: true,
       })
     ).start();
 
-    // Pulse animation
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       ])
     ).start();
 
-    // Dot animations
-    const dotLoop = (anim: Animated.Value, delay: number) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, { toValue: -8, duration: 300, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: 300, useNativeDriver: true }),
-        ])
-      ).start();
-    };
-    dotLoop(dotAnim1, 0);
-    dotLoop(dotAnim2, 200);
-    dotLoop(dotAnim3, 400);
+    Animated.timing(progressPercent, {
+      toValue: 95,
+      duration: 10000,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
 
-    // Message rotation
+    let activeMsgIndex = 0;
     const msgInterval = setInterval(() => {
-      setMsgIndex((p) => (p + 1) % motivationalMessages.length);
-    }, 2500);
+      Animated.timing(fadeOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        activeMsgIndex = (activeMsgIndex + 1) % motivationalMessages.length;
+        setCurrentMsg(motivationalMessages[activeMsgIndex]);
+        Animated.timing(fadeOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3800);
 
-    // API call
     fetchQuiz();
 
     return () => clearInterval(msgInterval);
@@ -115,11 +115,10 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchQuiz = async () => {
     const { pdfBase64, geminiFileUri, pdfPageRange, pdfName, pdfUri } = useQuizStore.getState();
     const { askedQuestions, addAskedQuestions, seenQuestionTexts, addSeenQuestionTexts } = useSettingsStore.getState();
-
-    // Retrieve recent question texts from history to prevent duplicate/similar questions
     const { history } = useHistoryStore.getState();
+
     const historyQuestionTexts = history
-      .slice(0, 6) // Last 6 tests (covers up to 120 questions, enough for context)
+      .slice(0, 6)
       .flatMap(h => {
         const list: string[] = [];
         if (h.questions) {
@@ -127,7 +126,6 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
             if (q.question_text) list.push(q.question_text);
           });
         } else {
-          // Fallback for older test history
           if (h.result.wrongAnswers) {
             h.result.wrongAnswers.forEach(wa => {
               if (wa.question?.question_text) list.push(wa.question.question_text);
@@ -143,19 +141,11 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
       })
       .filter(Boolean);
 
-    // Combine history question texts and immediately-saved seenQuestionTexts
     const combinedQuestionTexts = Array.from(new Set([
       ...historyQuestionTexts,
       ...seenQuestionTexts
-    ])).slice(0, 60); // Keep up to 60 unique question texts; prompt-level trim further reduces to 40
+    ])).slice(0, 60);
 
-    console.log('[Diagnostic] History length:', history.length);
-    console.log('[Diagnostic] Combined question texts count:', combinedQuestionTexts.length);
-    console.log('[Diagnostic] Combined question texts:', JSON.stringify(combinedQuestionTexts, null, 2));
-    console.log('[Diagnostic] Asked questions (concepts) count:', askedQuestions.length);
-    console.log('[Diagnostic] Asked questions (concepts):', JSON.stringify(askedQuestions, null, 2));
-
-    // Dynamically calculate the final page range based on selected topics if pdfPageRange is not manually provided
     let finalPageRange = pdfPageRange;
     if (!finalPageRange && selectedTopics.length > 0) {
       const ranges: string[] = [];
@@ -167,12 +157,10 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       });
       if (ranges.length > 0) {
-        // De-duplicate and join multiple ranges
         finalPageRange = Array.from(new Set(ranges)).join(', ');
       }
     }
 
-    // Lazy load base64 from disk on startup if empty (respects 6MB AsyncStorage limit!)
     let finalBase64 = pdfBase64;
     if (!finalBase64 && pdfUri && Platform.OS !== 'web') {
       try {
@@ -199,7 +187,6 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         combinedQuestionTexts
       );
 
-      // Save new question texts and subtopics immediately upon generation
       if (quiz.questions) {
         const newQuestionTexts = quiz.questions
           .map((q) => q.question_text || '')
@@ -216,10 +203,16 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       }
 
-      setQuestions(quiz.questions);
-      navigation.replace('Quiz');
+      Animated.timing(progressPercent, {
+        toValue: 100,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(() => {
+        setQuestions(quiz.questions);
+        navigation.replace('Quiz');
+      });
+
     } catch (error: any) {
-      // PDF Dosya Süresi Dolma / Silinme Hatası ve Otomatik İyileştirme (Auto-healing)
       const isPdfExpired = error.message && (
         error.message.includes('PDF_EXPIRED') ||
         error.message.includes('permission to access the File') ||
@@ -248,10 +241,9 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
       let healed = false;
       if (isPdfExpired && canTryHealing) {
         try {
-          console.log('[Auto-Healing] PDF dosyasının süresi dolmuş veya silinmiş. Otomatik olarak yeniden yükleniyor...');
+          console.log('[Auto-Healing] PDF expired, re-uploading...');
           const { uploadToGeminiFiles } = require('../services/geminiService');
           
-          // Re-upload the PDF to get a new active File URI
           const newGeminiFileUri = await uploadToGeminiFiles(
             finalBase64 || '',
             pdfName || 'kpss_document.pdf',
@@ -260,18 +252,13 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
           );
 
           if (newGeminiFileUri) {
-            console.log('[Auto-Healing] PDF başarıyla yeniden yüklendi. Yeni URI:', newGeminiFileUri);
-            
-            // Update the Zustand store and AsyncStorage with the new File URI
             const quizStore = useQuizStore.getState();
             quizStore.setPdfContext(pdfUri, finalBase64, pdfName, newGeminiFileUri);
             
-            // If the PDF belongs to a specific slot, update the slot as well
             if (quizStore.selectedSlotId) {
               quizStore.uploadToPdfSlot(quizStore.selectedSlotId, pdfUri || '', finalBase64 || '', pdfName || '', newGeminiFileUri);
             }
 
-            // Retry generating the quiz with the new active File URI
             const quiz = await generateQuiz(
               selectedTopics,
               questionCount,
@@ -285,7 +272,6 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
               combinedQuestionTexts
             );
 
-            // Save new question texts and subtopics immediately upon generation
             if (quiz.questions) {
               const newQuestionTexts = quiz.questions
                 .map((q) => q.question_text || '')
@@ -302,46 +288,55 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
               }
             }
 
-            setQuestions(quiz.questions);
-            healed = true;
-            navigation.replace('Quiz');
-            return; // Success! Exit early.
+            Animated.timing(progressPercent, {
+              toValue: 100,
+              duration: 200,
+              useNativeDriver: false,
+            }).start(() => {
+              setQuestions(quiz.questions);
+              healed = true;
+              navigation.replace('Quiz');
+            });
+            return;
           }
         } catch (healingError: any) {
-          console.warn('[Auto-Healing] PDF yeniden yükleme başarısız oldu:', healingError.message);
+          console.warn('[Auto-Healing] failed:', healingError.message);
         }
       }
 
-      // If we got here and it was a PDF expired error, it means we couldn't heal it because local files are missing
-      let displayMsg = error.message || 'Beklenmedik bir hata oluştu. Lütfen API anahtarınızı ve internetinizi kontrol edin.';
+      let displayMsg = error.message || 'Hata oluştu. Lütfen bağlantınızı kontrol edin.';
       if (isPdfExpired && !healed) {
-        const expiredFriendlyError = 'Seçtiğiniz PDF belgesinin sunucudaki 48 saatlik süresi dolmuş veya cihazınızdaki geçici önbellek silinmiş.\n\nÇözüm: Lütfen ana sayfadaki "Kaynak Doküman Kütüphanesi" alanından bu belgeyi çöp kutusu simgesine basarak silin ve dosyayı cihazınızdan tekrar yükleyin.';
+        const expiredFriendlyError = 'PDF belgesinin sunucudaki süresi dolmuş. Lütfen bu belgeyi çöp kutusuna basarak silip tekrar yükleyin.';
         setError(expiredFriendlyError);
         displayMsg = expiredFriendlyError;
       } else {
-        setError(error.message || 'Bilinmeyen bir hata oluştu.');
+        setError(error.message || 'Bilinmeyen hata.');
       }
       
       if (Platform.OS === 'web') {
-        window.alert(`Test Oluşturulamadı!\n\nHata: ${displayMsg}`);
+        window.alert(`Hata: ${displayMsg}`);
       } else {
-        Alert.alert(
-          'Test Oluşturulamadı',
-          displayMsg,
-          [{ text: 'Tamam' }]
-        );
+        Alert.alert('Hata', displayMsg, [{ text: 'Tamam' }]);
       }
       navigation.goBack();
     }
   };
 
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  const widthPercentage = progressPercent.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
   const s = getStyles(colors);
 
   return (
     <SafeAreaView style={s.container}>
       <View style={s.center}>
-        <View style={s.animationWrapper}>
+        
+        {/* Sleek, Premium Monochrome Loader */}
+        <View style={s.animationContainerOuter}>
           <Animated.View style={[s.spinnerOuter, { transform: [{ rotate: spin }] }]} />
           <Animated.View style={[s.emojiContainer, { transform: [{ scale: pulseAnim }] }]}>
             <Text style={s.emoji}>🧠</Text>
@@ -349,34 +344,137 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <Text style={s.title}>Test Hazırlanıyor</Text>
-        <Text style={s.message}>{motivationalMessages[msgIndex]}</Text>
+        
+        <Animated.View style={{ opacity: fadeOpacity, minHeight: 32, justifyContent: 'center' }}>
+          <Text style={s.message}>{currentMsg}</Text>
+        </Animated.View>
 
-        <View style={s.dotsRow}>
-          {[dotAnim1, dotAnim2, dotAnim3].map((anim, i) => (
-            <Animated.View key={i} style={[s.dot, { transform: [{ translateY: anim }] }]} />
-          ))}
+        {/* Micro-thin Progress Bar */}
+        <View style={s.progressContainer}>
+          <View style={s.progressBarBg}>
+            <Animated.View style={[s.progressBarFill, { width: widthPercentage }]} />
+          </View>
         </View>
 
+        {/* Flat info card (Warm beige/grey card) */}
         <View style={s.infoCard}>
-          <Text style={s.infoLabel}>📝 {questionCount} soru</Text>
-          <Text style={s.infoLabel}>📚 {selectedTopics.length} konu</Text>
+          <View style={s.infoItem}>
+            <Text style={s.infoEmoji}>📝</Text>
+            <Text style={s.infoText}>{questionCount} Soru</Text>
+          </View>
+          <View style={s.infoDivider} />
+          <View style={s.infoItem}>
+            <Text style={s.infoEmoji}>🎯</Text>
+            <Text style={s.infoText}>
+              {difficulty === 'easy' ? 'Kolay' : difficulty === 'medium' ? 'Orta' : difficulty === 'hard' ? 'Zor' : 'Uzman'}
+            </Text>
+          </View>
         </View>
+
       </View>
     </SafeAreaView>
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl },
-  animationWrapper: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxl },
-  spinnerOuter: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: colors.border, borderTopColor: colors.primary, position: 'absolute' },
-  emojiContainer: { alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 56 },
-  title: { color: colors.textPrimary, fontSize: fontSize.xxl, fontWeight: '800', marginBottom: spacing.sm },
-  message: { color: colors.textSecondary, fontSize: fontSize.md, textAlign: 'center', marginBottom: spacing.xxl },
-  dotsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xxxl },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  infoCard: { flexDirection: 'row', gap: spacing.xl, backgroundColor: colors.surface, borderRadius: borderRadius.md, paddingVertical: spacing.md, paddingHorizontal: spacing.xl, borderWidth: 1, borderColor: colors.border },
-  infoLabel: { color: colors.textSecondary, fontSize: fontSize.sm },
+const getStyles = (colors: AppTheme) => StyleSheet.create({
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.background 
+  },
+  center: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: spacing.xxl 
+  },
+  animationContainerOuter: {
+    width: 110,
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xxxl,
+  },
+  spinnerOuter: { 
+    width: 104, 
+    height: 104, 
+    borderRadius: 52, 
+    borderWidth: 2, 
+    borderColor: colors.borderSubtle, 
+    borderTopColor: colors.primary, 
+    position: 'absolute' 
+  },
+  emojiContainer: { 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    ...shadow(1),
+  },
+  emoji: { 
+    fontSize: 26 
+  },
+  title: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.xl, 
+    fontWeight: '900', 
+    marginBottom: spacing.xs,
+    letterSpacing: -0.5,
+  },
+  message: { 
+    color: colors.textSecondary, 
+    fontSize: fontSize.sm + 1, 
+    textAlign: 'center', 
+    fontWeight: '700',
+    paddingHorizontal: spacing.xl,
+  },
+  progressContainer: {
+    width: '75%',
+    marginTop: spacing.lg,
+    marginBottom: spacing.xxxl,
+  },
+  progressBarBg: {
+    height: 3, // Micro-thin
+    backgroundColor: colors.borderSubtle,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary,
+  },
+  infoCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    backgroundColor: colors.surfaceElevated, 
+    borderRadius: borderRadius.md, 
+    paddingVertical: spacing.md - 3, 
+    paddingHorizontal: spacing.xl, 
+    borderWidth: 1.5, 
+    borderColor: colors.border,
+    ...shadow(1),
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  infoEmoji: {
+    fontSize: 14,
+  },
+  infoText: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.sm - 1,
+    fontWeight: '800',
+  },
+  infoDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: colors.borderLight,
+    marginHorizontal: spacing.md,
+  }
 });

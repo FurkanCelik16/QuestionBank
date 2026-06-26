@@ -91,16 +91,23 @@ export const SmartIndexScreen: React.FC = () => {
         concept,
         activeTab,
         apiKey,
-        pdfBase64,
+        geminiFileUri ? null : pdfBase64,
         geminiFileUri
       );
       setSummary(res);
     } catch (err: any) {
       console.error(err);
+      const isExpired = err.message?.includes('PDF_EXPIRED') || err.message?.includes('not found') || err.message?.includes('files/');
+      
+      const title = isExpired ? 'PDF Süresi Dolmuş' : 'Hata';
+      const msg = isExpired 
+        ? 'Seçili PDF dosyasının sunucudaki süresi dolmuş. Lütfen Konu Seçimi ekranına giderek PDF dosyasını yeniden seçin/yükleyin.'
+        : 'Yapay zeka özet hazırlarken bir sorun yaşadı. Lütfen tekrar deneyin.';
+
       if (Platform.OS === 'web') {
-        window.alert('Ders notu hazırlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+        window.alert(msg);
       } else {
-        Alert.alert('Hata', 'Ders notu hazırlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+        Alert.alert(title, msg);
       }
       setSelectedConcept(null);
     } finally {

@@ -19,14 +19,12 @@ export const MapQuizResultScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleFinish = () => {
     resetQuiz();
-    // Topic selection içinde tab olarak ekleneceği için şimdilik MapQuizHome'a değil, 
-    // stack'in başına dönelim veya TopicSelection'a gidelim
-    navigation.navigate('TopicSelection');
+    navigation.navigate('TopicSelection', { initialTab: 'harita' });
   };
 
   const handleRetry = () => {
     resetQuiz();
-    navigation.replace('MapQuizHome');
+    navigation.navigate('TopicSelection', { initialTab: 'harita' });
   };
 
   let emoji = '😐';

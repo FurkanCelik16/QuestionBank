@@ -1,15 +1,10 @@
-// ========================================
-// History Screen
-// View overall stats and past quiz results
-// ========================================
-
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, TestHistoryItem, DifficultyLevel } from '../types';
@@ -45,7 +40,6 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
     ? Math.round(history.reduce((acc, curr) => acc + curr.result.scorePercentage, 0) / totalTests)
     : 0;
 
-  // Bugün çözülen soru sayısını hesaplama
   const questionsSolvedToday = history.reduce((acc, curr) => {
     const testDate = new Date(curr.date);
     const today = new Date();
@@ -55,7 +49,6 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
     return isToday ? acc + curr.result.totalQuestions : acc;
   }, 0);
 
-  // Günlük ortalama çözülen soru sayısı (en az 1 test çözülen gün sayısına göre)
   const activeDays = new Set(history.map(item => {
     const d = new Date(item.date);
     return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -81,196 +74,278 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   const s = getStyles(colors);
 
-  const renderItem = ({ item }: { item: TestHistoryItem }) => (
-    <TouchableOpacity
-      style={s.historyCard}
-      activeOpacity={0.7}
-      onPress={() => handleTestPress(item)}
-    >
-      <View style={s.cardHeader}>
-        <Text style={s.cardDate}>{formatDate(item.date)}</Text>
-        <View style={s.scoreBadge}>
-          <Text style={s.scoreText}>%{item.result.scorePercentage}</Text>
+  const renderItem = ({ item }: { item: TestHistoryItem }) => {
+    const isHigh = item.result.scorePercentage >= 70;
+    const isMedium = item.result.scorePercentage >= 40 && item.result.scorePercentage < 70;
+    const cardAccentColor = isHigh ? colors.success : isMedium ? colors.warning : colors.error;
+    const cardGlowColor = isHigh ? colors.successGlow : isMedium ? colors.warningGlow : colors.errorGlow;
+
+    return (
+      <TouchableOpacity
+        style={[s.historyCard, { borderLeftColor: cardAccentColor }]}
+        activeOpacity={0.9}
+        onPress={() => handleTestPress(item)}
+      >
+        <View style={s.cardHeader}>
+          <Text style={s.cardDate}>{formatDate(item.date)}</Text>
+          <View style={[s.scoreBadge, { backgroundColor: cardGlowColor }]}>
+            <Text style={[s.scoreText, { color: cardAccentColor }]}>%{item.result.scorePercentage}</Text>
+          </View>
         </View>
-      </View>
-      <Text style={s.topicsText} numberOfLines={2}>
-        {item.topics.join(', ')}
-      </Text>
-      <View style={s.statsRow}>
-        <Text style={s.statText}>{DIFF_LABELS[item.difficulty] || '🎯 Orta'}</Text>
-        <Text style={s.statText}>📝 {item.result.totalQuestions} Soru</Text>
-        <Text style={[s.statText, { color: colors.success }]}>✓ {item.result.correctCount} D</Text>
-        <Text style={[s.statText, { color: colors.error }]}>✗ {item.result.wrongCount} Y</Text>
-      </View>
-    </TouchableOpacity>
-  );
+        
+        <Text style={s.topicsText} numberOfLines={2}>
+          {item.topics.join(', ')}
+        </Text>
+        
+        <View style={s.cardDivider} />
+
+        <View style={s.statsRow}>
+          <Text style={s.statText}>{DIFF_LABELS[item.difficulty] || '🎯 Orta'}</Text>
+          <Text style={s.statDotSeparator}>•</Text>
+          <Text style={s.statText}>📝 {item.result.totalQuestions} Soru</Text>
+          <Text style={s.statDotSeparator}>•</Text>
+          <Text style={[s.statText, { color: colors.success }]}>✓ {item.result.correctCount} D</Text>
+          <Text style={s.statDotSeparator}>•</Text>
+          <Text style={[s.statText, { color: colors.error }]}>✗ {item.result.wrongCount} Y</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
+      {/* Title */}
       <View style={s.header}>
         <Text style={s.headerTitle}>İstatistiklerim</Text>
       </View>
 
-      <View style={s.overviewCard}>
-        <View style={s.overviewRow}>
-          <View style={s.overviewItem}>
-            <Text style={s.overviewValue}>{totalTests}</Text>
-            <Text style={s.overviewLabel}>Test Çözüldü</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+        {/* Dashboard Stat Board */}
+        <View style={s.overviewCard}>
+          <View style={s.overviewRow}>
+            <View style={s.overviewItem}>
+              <Text style={s.overviewValue}>{totalTests}</Text>
+              <Text style={s.overviewLabel}>Çözülen Test</Text>
+            </View>
+            <View style={s.divider} />
+            <View style={s.overviewItem}>
+              <Text style={[s.overviewValue, { color: colors.textPrimary }]}>%{avgScore}</Text>
+              <Text style={s.overviewLabel}>Ort. Başarı</Text>
+            </View>
           </View>
-          <View style={s.divider} />
-          <View style={s.overviewItem}>
-            <Text style={s.overviewValue}>%{avgScore}</Text>
-            <Text style={s.overviewLabel}>Ortalama Başarı</Text>
-          </View>
-        </View>
-        <View style={[s.overviewRow, s.overviewRowBottom]}>
-          <View style={s.overviewItem}>
-            <Text style={s.overviewValue}>{totalQuestions}</Text>
-            <Text style={s.overviewLabel}>Soru Görüldü</Text>
-          </View>
-          <View style={s.divider} />
-          <View style={s.overviewItem}>
-            <Text style={[s.overviewValue, { color: colors.success }]}>{totalCorrect}</Text>
-            <Text style={s.overviewLabel}>Toplam Doğru</Text>
-          </View>
-        </View>
-        <View style={[s.overviewRow, s.overviewRowBottom]}>
-          <View style={s.overviewItem}>
-            <Text style={[s.overviewValue, { color: colors.warning }]}>{questionsSolvedToday}</Text>
-            <Text style={s.overviewLabel}>Bugün Çözülen</Text>
-          </View>
-          <View style={s.divider} />
-          <View style={s.overviewItem}>
-            <Text style={[s.overviewValue, { color: colors.accent }]}>{dailyAverageQuestions}</Text>
-            <Text style={s.overviewLabel}>Günlük Ortalama</Text>
-          </View>
-        </View>
-      </View>
+          
+          <View style={s.cardDivider} />
 
-      {/* Hata Defteri Button */}
-      <TouchableOpacity
-        style={[s.mistakeBtn, wrongQuestionsCount === 0 && s.mistakeBtnDisabled]}
-        onPress={() => wrongQuestionsCount > 0 && navigation.navigate('MistakeResolver')}
-        activeOpacity={0.8}
-        disabled={wrongQuestionsCount === 0}
-      >
-        <Text style={s.mistakeBtnText}>📓 Hata Defterini Çöz</Text>
-        <View style={[s.mistakeBadge, { backgroundColor: wrongQuestionsCount === 0 ? colors.surfaceHighlight : colors.warningGlow }]}>
-          <Text style={[s.mistakeBadgeText, { color: wrongQuestionsCount > 0 ? colors.warning : colors.success }]}>
-            {wrongQuestionsCount > 0 ? `${wrongQuestionsCount} Yanlış sorunuz var` : 'Temiz ✓'}
-          </Text>
-        </View>
-      </TouchableOpacity>
+          <View style={s.overviewRow}>
+            <View style={s.overviewItem}>
+              <Text style={s.overviewValue}>{totalQuestions}</Text>
+              <Text style={s.overviewLabel}>Görülen Soru</Text>
+            </View>
+            <View style={s.divider} />
+            <View style={s.overviewItem}>
+              <Text style={[s.overviewValue, { color: colors.success }]}>{totalCorrect}</Text>
+              <Text style={s.overviewLabel}>Toplam Doğru</Text>
+            </View>
+          </View>
+          
+          <View style={s.cardDivider} />
 
-      <Text style={s.listTitle}>Geçmiş Testler ({totalTests})</Text>
-
-      {totalTests === 0 ? (
-        <View style={s.emptyState}>
-          <Text style={s.emptyEmoji}>📭</Text>
-          <Text style={s.emptyText}>Henüz hiç test çözmediniz.</Text>
-          <Text style={s.emptySubtext}>Test çözdükçe istatistiklerinizi burada görebilirsiniz.</Text>
+          <View style={s.overviewRow}>
+            <View style={s.overviewItem}>
+              <Text style={[s.overviewValue, { color: colors.warning }]}>{questionsSolvedToday}</Text>
+              <Text style={s.overviewLabel}>Bugün Çözülen</Text>
+            </View>
+            <View style={s.divider} />
+            <View style={s.overviewItem}>
+              <Text style={[s.overviewValue, { color: colors.textPrimary }]}>{dailyAverageQuestions}</Text>
+              <Text style={s.overviewLabel}>Günlük Ort.</Text>
+            </View>
+          </View>
         </View>
-      ) : (
-        <FlatList
-          data={history}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={s.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+
+        {/* Minimalist Hata Defteri Button Card */}
+        <TouchableOpacity
+          style={[
+            s.mistakeBtn, 
+            wrongQuestionsCount === 0 && s.mistakeBtnDisabled,
+            wrongQuestionsCount > 0 && s.mistakeBtnActive
+          ]}
+          onPress={() => wrongQuestionsCount > 0 && navigation.navigate('MistakeResolver')}
+          activeOpacity={0.9}
+          disabled={wrongQuestionsCount === 0}
+        >
+          <View style={s.mistakeBtnLeft}>
+            <Text style={s.mistakeEmoji}>📓</Text>
+            <Text style={[
+              s.mistakeBtnText, 
+              wrongQuestionsCount > 0 && { color: colors.warningDark }
+            ]}>
+              Hata Defterini Çöz
+            </Text>
+          </View>
+          <View style={[
+            s.mistakeBadge, 
+            { backgroundColor: wrongQuestionsCount === 0 ? colors.backgroundAlt : colors.warningGlow }
+          ]}>
+            <Text style={[
+              s.mistakeBadgeText, 
+              { color: wrongQuestionsCount > 0 ? colors.warningDark : colors.success }
+            ]}>
+              {wrongQuestionsCount > 0 ? `${wrongQuestionsCount} Hatalı Soru` : 'Kusursuz ✓'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* History List Title */}
+        <Text style={s.listTitle}>Geçmiş Testler ({totalTests})</Text>
+
+        {totalTests === 0 ? (
+          <View style={s.emptyState}>
+            <Text style={s.emptyEmoji}>📬</Text>
+            <Text style={s.emptyText}>Henüz sınav çözülmemiş</Text>
+            <Text style={s.emptySubtext}>Yapay zeka ile sınavlar hazırlayıp çözdükçe başarı geçmişiniz burada listelenecektir.</Text>
+          </View>
+        ) : (
+          <View style={s.listWrapper}>
+            {history.map((item) => (
+              <React.Fragment key={item.id}>
+                {renderItem({ item })}
+              </React.Fragment>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.xxl, paddingTop: spacing.md, paddingBottom: spacing.lg },
-  headerTitle: { color: colors.textPrimary, fontSize: fontSize.xxl, fontWeight: '800' },
+const getStyles = (colors: AppTheme) => StyleSheet.create({
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.background 
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxxl,
+  },
+  header: { 
+    paddingHorizontal: spacing.xxl, 
+    paddingTop: spacing.md, 
+    paddingBottom: spacing.sm 
+  },
+  headerTitle: { 
+    color: colors.textPrimary, 
+    fontSize: fontSize.xxl - 1, 
+    fontWeight: '900',
+    letterSpacing: -0.8,
+  },
   mistakeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: spacing.xxl,
-    backgroundColor: colors.surface,
-    borderColor: colors.warning,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1.5,
-    borderRadius: borderRadius.lg,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
     marginBottom: spacing.xl,
+    height: 54,
+    ...shadow(1, colors.primary),
+  },
+  mistakeBtnActive: {
+    borderColor: colors.warningDark,
+    backgroundColor: colors.surfaceElevated,
   },
   mistakeBtnDisabled: {
-    borderColor: colors.border,
-    opacity: 0.8,
+    opacity: 0.5,
+    borderColor: colors.borderSubtle,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  mistakeBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  mistakeEmoji: {
+    fontSize: 18,
   },
   mistakeBtnText: {
     color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '700',
+    fontSize: fontSize.sm,
+    fontWeight: '800',
   },
   mistakeBadge: {
     paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
+    paddingVertical: 5,
+    borderRadius: borderRadius.sm,
   },
   mistakeBadgeText: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.xxs + 1,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   overviewCard: {
     marginHorizontal: spacing.xxl,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
     borderColor: colors.border,
     marginBottom: spacing.xl,
+    paddingVertical: spacing.xs,
+    ...shadow(1, colors.primary),
   },
   overviewRow: {
     flexDirection: 'row',
-    paddingVertical: spacing.lg,
-  },
-  overviewRowBottom: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    paddingVertical: spacing.md - 2,
   },
   overviewItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   divider: {
     width: 1,
-    backgroundColor: colors.border,
+    backgroundColor: colors.borderSubtle,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.borderSubtle,
   },
   overviewValue: {
     color: colors.textPrimary,
-    fontSize: fontSize.xxl,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: fontSize.xl - 2,
+    fontWeight: '900',
+    marginBottom: 2,
+    letterSpacing: -0.5,
   },
   overviewLabel: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+    color: colors.textMuted,
+    fontSize: fontSize.xxs + 1,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   listTitle: {
     color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.md,
+    fontWeight: '800',
     marginHorizontal: spacing.xxl,
     marginBottom: spacing.md,
+    letterSpacing: -0.2,
   },
-  listContent: {
+  listWrapper: {
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    gap: spacing.md,
   },
   historyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    borderLeftWidth: 3.5,
+    padding: spacing.xl - 4,
+    ...shadow(1, colors.primary),
   },
   cardHeader: {
     flexDirection: 'row',
@@ -280,40 +355,46 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   cardDate: {
     color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontSize: fontSize.xs - 1,
+    fontWeight: '700',
   },
   scoreBadge: {
-    backgroundColor: colors.primaryGlow,
     paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
   },
   scoreText: {
-    color: colors.primary,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
+    fontSize: fontSize.xs - 1,
+    fontWeight: '800',
   },
   topicsText: {
     color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '600',
+    fontSize: fontSize.sm,
+    fontWeight: '700',
     marginBottom: spacing.md,
+    lineHeight: 18,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   statText: {
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontSize: fontSize.xs - 1,
+    fontWeight: '700',
+  },
+  statDotSeparator: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    marginHorizontal: spacing.xs,
+    fontWeight: '900',
   },
   emptyState: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xxxl,
+    marginTop: spacing.xl,
   },
   emptyEmoji: {
     fontSize: 48,
@@ -321,14 +402,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   emptyText: {
     color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.md,
+    fontWeight: '800',
     marginBottom: spacing.xs,
   },
   emptySubtext: {
     color: colors.textMuted,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs + 1,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
+    fontWeight: '600',
   },
 });

@@ -6,7 +6,7 @@ import {
   Animated,
   View,
 } from 'react-native';
-import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 
 interface OptionButtonProps {
   label: string; // A, B, C, D, E
@@ -31,13 +31,13 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
 
     Animated.sequence([
       Animated.timing(scaleAnim, {
-        toValue: 0.97,
-        duration: 60,
+        toValue: 0.98,
+        duration: 50,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 5,
+        friction: 6,
         tension: 400,
         useNativeDriver: true,
       }),
@@ -46,91 +46,62 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
     onPress();
   };
 
-  const s = getStyles(colors);
+  const s = getStyles(colors, isSelected);
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+    <Animated.View style={[s.outer, { transform: [{ scale: scaleAnim }] }]}>
       <TouchableOpacity
         onPress={handlePress}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
         disabled={disabled}
-        style={[
-          s.container,
-          isSelected && s.containerSelected,
-        ]}
+        style={s.container}
       >
-        <View
-          style={[
-            s.labelBadge,
-            isSelected && s.labelBadgeSelected,
-          ]}
-        >
-          <Text
-            style={[
-              s.labelText,
-              isSelected && s.labelTextSelected,
-            ]}
-          >
-            {label}
-          </Text>
+        <View style={s.labelBadge}>
+          <Text style={s.labelText}>{label}</Text>
         </View>
-        <Text
-          style={[
-            s.optionText,
-            isSelected && s.optionTextSelected,
-          ]}
-        >
-          {text}
-        </Text>
+        <Text style={s.optionText}>{text}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: AppTheme, isSelected: boolean) => StyleSheet.create({
+  outer: {
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.md,
+    ...shadow(isSelected ? 3 : 1, colors.primary),
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: isSelected ? colors.primary : colors.surface,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.lg,
+    borderColor: isSelected ? colors.primary : colors.border,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.lg - 2,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm + 2,
-  },
-  containerSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryGlow,
   },
   labelBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceHighlight,
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.sm,
+    backgroundColor: isSelected ? colors.surface : colors.surfaceHighlight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
-  },
-  labelBadgeSelected: {
-    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: isSelected ? colors.borderLight : 'transparent',
   },
   labelText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
-    fontWeight: '700',
-  },
-  labelTextSelected: {
-    color: colors.textInverse,
+    color: isSelected ? colors.primary : colors.textPrimary,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
   },
   optionText: {
     flex: 1,
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
+    color: isSelected ? colors.textInverse : colors.textSecondary,
+    fontSize: fontSize.md - 1,
     lineHeight: 22,
-  },
-  optionTextSelected: {
-    color: colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: isSelected ? '700' : '500',
   },
 });
