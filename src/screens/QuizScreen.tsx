@@ -153,7 +153,9 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
           <View style={s.questionCard}>
             <View style={s.qTypeRow}>
               <View style={s.qTypeBadge}>
-                <Text style={s.qType}>{question.type || 'ÇOKTAN SEÇMELİ'}</Text>
+                <Text style={s.qType} numberOfLines={1} ellipsizeMode="tail">
+                  {question.subtopic || 'GENEL BİLGİ'}{question.page_number ? ` · S. ${question.page_number}` : ''}
+                </Text>
               </View>
               {difficulty && (
                 <View style={s.difficultyBadge}>
@@ -342,6 +344,8 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
+    flexShrink: 1,
+    marginRight: spacing.sm,
   },
   qType: { 
     color: colors.textPrimary, 
