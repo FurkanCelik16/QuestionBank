@@ -380,11 +380,6 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation, route }) => 
                               <Text style={[s.slotName, isSelected && { color: colors.textPrimary }]} numberOfLines={2}>
                                 {slot.name}
                               </Text>
-                              <View style={[s.slotBadge, isSelected && s.slotBadgeSelected]}>
-                                <Text style={[s.slotBadgeText, isSelected && { color: colors.textInverse }]}>
-                                  {isSelected ? 'Aktif' : 'Seç'}
-                                </Text>
-                              </View>
                             </View>
                           </View>
                         ) : (
@@ -607,9 +602,9 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     paddingBottom: spacing.lg 
   },
   bottomPanel: { 
-    paddingHorizontal: spacing.xxl, 
-    paddingTop: spacing.lg, 
-    paddingBottom: spacing.xl, 
+    paddingHorizontal: spacing.md, 
+    paddingTop: spacing.xs, 
+    paddingBottom: spacing.md, 
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     borderTopWidth: 1.5, 
@@ -618,7 +613,7 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     ...shadow(2),
   },
   qcSection: { 
-    marginBottom: spacing.md 
+    marginBottom: spacing.sm 
   },
   qcLabel: { 
     color: colors.textPrimary, // Increased contrast to pure white/black
@@ -698,7 +693,7 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: spacing.sm 
+    marginBottom: spacing.xs 
   },
   clearPdf: { 
     color: colors.textSecondary, // Increased contrast
@@ -715,19 +710,17 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
   },
   slotsRow: { 
     flexDirection: 'row', 
-    gap: spacing.md, 
-    justifyContent: 'flex-start', 
+    gap: spacing.xs, 
+    justifyContent: 'space-between', 
     marginBottom: spacing.xs, 
-    flexWrap: 'wrap' 
   },
   slotWrapper: { 
-    width: '23%', 
-    minWidth: 72, 
+    width: '23.5%', 
     position: 'relative' 
   },
   slotCard: { 
     width: '100%', 
-    height: 80, 
+    height: 50, 
     borderRadius: borderRadius.md, 
     borderWidth: 1.5, 
     borderColor: colors.border, 
@@ -749,7 +742,7 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.sm,
+    padding: 3,
     backgroundColor: colors.surface,
   },
   slotInnerOverlayActive: {
@@ -760,20 +753,20 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.sm,
+    padding: 3,
     borderStyle: 'dashed',
   },
   slotEmoji: { 
-    fontSize: 16, 
-    marginBottom: 2 
+    fontSize: 12, 
+    marginBottom: 0 
   },
   slotName: { 
     color: colors.textPrimary, 
-    fontSize: 9, 
-    fontWeight: '800', 
+    fontSize: 7.5, 
+    lineHeight: 9,
+    fontWeight: '700', 
     textAlign: 'center', 
-    flex: 1, 
-    marginBottom: 2 
+    marginBottom: 0 
   },
   slotBadge: { 
     backgroundColor: colors.surfaceLight, 
@@ -789,18 +782,19 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
   },
   slotBadgeText: { 
     color: colors.textSecondary, 
-    fontSize: 9, 
+    fontSize: 8, 
     fontWeight: '800' 
   },
   slotEmptyEmoji: { 
-    fontSize: 18, 
+    fontSize: 12, 
     color: colors.textMuted, 
     fontWeight: '600',
-    marginBottom: 2 
+    marginBottom: 0 
   },
   slotEmptyText: { 
     color: colors.textMuted, 
-    fontSize: fontSize.xs, 
+    fontSize: 7.5, 
+    lineHeight: 9,
     fontWeight: '700' 
   },
   slotDeleteBtn: { 
