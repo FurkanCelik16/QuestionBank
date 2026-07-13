@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 import { useHistoryStore } from '../store/useHistoryStore';
+import { normalizeTurkish } from '../store/useSettingsStore';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, TestHistoryItem, DifficultyLevel } from '../types';
 
@@ -69,6 +70,70 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
       month: 'short',
       hour: '2-digit',
       minute: '2-digit',
+    });
+  };
+
+  // Zayıf yön analizi hesaplama
+  const subtopicStats = React.useMemo(() => {
+    const stats: Record<string, { subtopic: string; wrongCount: number; totalCount: number; parentTopics: Set<string> }> = {};
+
+    history.forEach(test => {
+      if (!test.questions) return;
+      
+      const wrongIds = new Set(test.result.wrongAnswers.map(wa => wa.question.id));
+
+      test.questions.forEach(q => {
+        const sub = q.subtopic || '';
+        const cleanedSub = normalizeTurkish(sub);
+        if (!cleanedSub || cleanedSub.length < 3) return;
+
+        if (!stats[cleanedSub]) {
+          stats[cleanedSub] = {
+            subtopic: sub,
+            wrongCount: 0,
+            totalCount: 0,
+            parentTopics: new Set<string>(),
+          };
+        }
+
+        stats[cleanedSub].totalCount++;
+        test.topics.forEach(t => stats[cleanedSub].parentTopics.add(t));
+
+        if (wrongIds.has(q.id)) {
+          stats[cleanedSub].wrongCount++;
+        }
+      });
+    });
+
+    return Object.values(stats)
+      .map(item => ({
+        subtopic: item.subtopic,
+        wrongCount: item.wrongCount,
+        totalCount: item.totalCount,
+        failureRate: item.totalCount > 0 ? (item.wrongCount / item.totalCount) : 0,
+        parentTopics: Array.from(item.parentTopics),
+      }))
+      .filter(item => item.wrongCount > 0)
+      .sort((a, b) => b.failureRate - a.failureRate || b.wrongCount - a.wrongCount)
+      .slice(0, 5);
+  }, [history]);
+
+  const startWeaknessQuiz = () => {
+    if (subtopicStats.length === 0) return;
+
+    const selectedTopics = Array.from(new Set(subtopicStats.flatMap(s => s.parentTopics)));
+    const focusSubtopics = subtopicStats.map(s => s.subtopic);
+
+    const finalTopics = selectedTopics.length > 0 
+      ? selectedTopics 
+      : Array.from(new Set(history.flatMap(h => h.topics)));
+
+    // Direct navigation to Loading Screen with parameters
+    navigation.navigate('Loading', {
+      selectedTopics: finalTopics,
+      questionCount: 10,
+      difficulty: 'medium',
+      focusSubtopics: focusSubtopics,
     });
   };
 
@@ -195,6 +260,56 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           </View>
         </TouchableOpacity>
+
+        {/* Zayıf Yön Analizi Bölümü */}
+        {subtopicStats.length > 0 && (
+          <View style={s.weaknessCard}>
+            <View style={s.weaknessHeader}>
+              <Text style={s.weaknessTitle}>Zayıf Olduğun Konular 📉</Text>
+              <Text style={s.weaknessDesc}>
+                Son testlerde en çok hata yaptığın mikro konu başlıkları. Yapay zeka ile bu konulara özel takviye testi oluşturabilirsin.
+              </Text>
+            </View>
+
+            <View style={s.weaknessList}>
+              {subtopicStats.map((item, index) => {
+                const percent = Math.round(item.failureRate * 100);
+                return (
+                  <View key={index} style={s.weaknessItem}>
+                    <View style={s.weaknessTextRow}>
+                      <Text style={s.weaknessSubtopic} numberOfLines={1}>
+                        🎯 {item.subtopic}
+                      </Text>
+                      <Text style={[s.weaknessRatio, { color: percent >= 75 ? colors.error : colors.warning }]}>
+                        %{percent} Hata ({item.wrongCount}/{item.totalCount})
+                      </Text>
+                    </View>
+                    
+                    <View style={s.progressBarBackground}>
+                      <View 
+                        style={[
+                          s.progressBarFill, 
+                          { 
+                            width: `${percent}%`,
+                            backgroundColor: percent >= 75 ? colors.error : colors.warning 
+                          }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity 
+              style={s.weaknessBtn} 
+              onPress={startWeaknessQuiz}
+              activeOpacity={0.8}
+            >
+              <Text style={s.weaknessBtnText}>Zayıf Yön Takviye Testi Başlat ⚡</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* History List Title */}
         <Text style={s.listTitle}>Geçmiş Testler ({totalTests})</Text>
@@ -412,5 +527,79 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     fontWeight: '600',
+  },
+  weaknessCard: {
+    marginHorizontal: spacing.xxl,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    marginBottom: spacing.xl,
+    padding: spacing.xl - 4,
+    ...shadow(1, colors.primary),
+  },
+  weaknessHeader: {
+    marginBottom: spacing.md,
+  },
+  weaknessTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: -0.2,
+  },
+  weaknessDesc: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  weaknessList: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  weaknessItem: {
+    gap: 6,
+  },
+  weaknessTextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  weaknessSubtopic: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.sm - 1,
+    fontWeight: '700',
+  },
+  weaknessRatio: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs - 1,
+    fontWeight: '700',
+  },
+  progressBarBackground: {
+    height: 4,
+    backgroundColor: colors.borderSubtle,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  weaknessBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    ...shadow(1, colors.primary),
+  },
+  weaknessBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
 });

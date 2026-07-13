@@ -37,7 +37,7 @@ interface SettingsState {
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  apiKey: '',
+  apiKey: 'AIzaSyBTyCo8aoRY7yq5ENnCUZh7_9FWWuicAU0',
   themeMode: 'dark', // Default theme
   geminiModel: 'gemini-3.1-flash-lite', // Default model
   askedQuestions: [],
@@ -164,7 +164,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const cleanedAsked = cleanSubtopics(Array.isArray(parsedAsked) ? parsedAsked : []);
 
       set({
-        apiKey: key || '',
+        apiKey: key || 'AIzaSyBTyCo8aoRY7yq5ENnCUZh7_9FWWuicAU0',
         themeMode: (theme as ThemeMode) || 'dark',
         geminiModel: model || 'gemini-3.1-flash-lite',
         askedQuestions: cleanedAsked,
@@ -187,6 +187,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 }));
 
+export function normalizeTurkish(str: string): string {
+  if (!str) return '';
+  return str.toLowerCase()
+    .normalize('NFD') // Decompose characters
+    .replace(/[\u0307]/g, '') // Remove combining dot above (i̇ becomes i)
+    .normalize('NFC') // Recompose
+    .trim();
+}
+
 export function cleanSubtopics(subtopics: string[]): string[] {
   const GENERIC_KEYWORDS = new Set([
     'tarih', 'coğrafya', 'cografya', 'kpss', 'genel', 'ders', 'dersi', 'konu', 'konusu', 'soru', 'sorusu', 'test', 'testi',
@@ -198,7 +207,7 @@ export function cleanSubtopics(subtopics: string[]): string[] {
 
   // Helper to add name and its variations
   const addNameAndVariations = (rawName: string) => {
-    const name = rawName.toLowerCase().trim();
+    const name = normalizeTurkish(rawName);
     if (!name) return;
 
     forbiddenTopicNames.add(name);
@@ -250,29 +259,28 @@ export function cleanSubtopics(subtopics: string[]): string[] {
   ];
   extraPeriods.forEach(p => addNameAndVariations(p));
 
+  // Sort forbidden names by length descending so that we replace longer matches first
+  const sortedForbidden = Array.from(forbiddenTopicNames).sort((a, b) => b.length - a.length);
+
   return subtopics
-    .map(s => s.trim())
+    .map(s => {
+      let cleaned = normalizeTurkish(s);
+      if (!cleaned) return '';
+
+      for (const forbidden of sortedForbidden) {
+        if (forbidden.length <= 5) continue;
+        cleaned = cleaned.split(forbidden).join('');
+      }
+
+      // Strip leading/trailing punctuation, dashes, colons, spaces
+      cleaned = cleaned.replace(/^[\s\-–:;,.()_#+/*]+|[\s\-–:;,.()_#+/*]+$/g, '').trim();
+      return cleaned;
+    })
     .filter(s => {
       if (!s) return false;
-      
-      const lower = s.toLowerCase();
-
-      // If it's a generic word, reject it
-      if (GENERIC_KEYWORDS.has(lower)) return false;
-
-      // If it matches any forbidden topic name variant exactly, reject it
-      if (forbiddenTopicNames.has(lower)) return false;
-
-      // Reject if it is too long (e.g., Gemini wrote a whole sentence instead of a micro-concept)
+      if (GENERIC_KEYWORDS.has(s)) return false;
       if (s.length > 120) return false;
-
-      // Reject if it matches any forbidden topic name variant as a substring
-      const isSubtopicMatch = Array.from(forbiddenTopicNames).some(forbidden => {
-        // Only do substring check for words longer than 5 letters to avoid false positives
-        if (forbidden.length <= 5) return false;
-        return lower === forbidden || lower.includes(forbidden);
-      });
-
-      return !isSubtopicMatch;
+      if (s.length < 3) return false;
+      return true;
     });
 }

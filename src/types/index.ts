@@ -20,6 +20,7 @@ export interface QuizQuestion {
   correct_answer: string;
   rational_explanation: string;
   page_number?: number;
+  mind_map_svg?: string;
 }
 
 export interface Quiz {
@@ -64,15 +65,16 @@ export interface TestHistoryItem {
 export interface Topic {
   id: string;
   name: string;
-  category: 'tarih' | 'cografya';
+  category: 'tarih' | 'cografya' | 'vatandaslik' | 'guncel';
 }
 
 export type RootStackParamList = {
-  TopicSelection: { initialTab?: 'tarih' | 'cografya' | 'harita' } | undefined;
+  TopicSelection: { initialTab?: 'tarih' | 'cografya' | 'vatandaslik' | 'guncel' | 'harita' } | undefined;
   Loading: {
     selectedTopics: string[];
     questionCount: number;
     difficulty: DifficultyLevel;
+    focusSubtopics?: string[];
   };
   Quiz: undefined;
   Result: {

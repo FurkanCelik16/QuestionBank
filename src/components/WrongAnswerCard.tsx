@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../theme/colors';
 import { QuizQuestion } from '../types';
+import { SvgXml } from 'react-native-svg';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -113,6 +114,16 @@ export const WrongAnswerCard: React.FC<WrongAnswerCardProps> = ({
             <Text style={s.explanationText}>
               {question.rational_explanation}
             </Text>
+
+            {/* Mind Map Section */}
+            {question.mind_map_svg && question.mind_map_svg.trim().length > 0 && (
+              <View style={s.mindMapContainer}>
+                <Text style={s.mindMapTitle}>🧠 AI Kavramsal Akıl Haritası</Text>
+                <View style={s.mindMapXmlWrapper}>
+                  <SvgXml xml={question.mind_map_svg} width="100%" height={140} />
+                </View>
+              </View>
+            )}
           </View>
 
           {/* All Options list */}
@@ -369,5 +380,26 @@ const getStyles = (colors: AppTheme) =>
       fontSize: 14,
       fontWeight: '900',
       marginLeft: spacing.sm,
+    },
+    mindMapContainer: {
+      marginTop: spacing.md,
+      backgroundColor: colors.background || '#0f172a',
+      borderRadius: borderRadius.md,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    mindMapTitle: {
+      color: colors.textPrimary,
+      fontSize: fontSize.xxs + 1,
+      fontWeight: '800',
+      marginBottom: spacing.sm,
+      letterSpacing: -0.2,
+    },
+    mindMapXmlWrapper: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      borderRadius: borderRadius.sm,
     },
   });

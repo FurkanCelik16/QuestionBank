@@ -72,6 +72,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
       result: result,
       questions: questions,
     });
+    await useQuizStore.getState().clearActiveSession();
     navigation.replace('Result');
   };
 

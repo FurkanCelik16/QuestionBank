@@ -3,18 +3,20 @@
 // Quiz generation via dynamically selected Gemini Models
 // ========================================
 
-import { Quiz, QuizQuestion, DifficultyLevel } from '../types';
+import { Quiz, QuizQuestion, DifficultyLevel, Topic } from '../types';
 import { useSettingsStore, cleanSubtopics } from '../store/useSettingsStore';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
+import { topics as topicsDb } from '../data/topics';
+// @ts-ignore
+const FileSystem = Platform.OS !== 'web' ? require('expo-file-system/legacy') : null;
 
 const TIMEOUT_MS = 120000; // 120 seconds timeout for processing PDFs and generating 20 questions
 
 const DIFFICULTY_PROMPTS: Record<DifficultyLevel, string> = {
-  easy: 'KOLAY seviye: Yalnızca temel kavramsal yorumlama, mantık yürütme ve paragrafı/metni anlama (yorum) düzeyinde sorular sor. Kesinlikle ezbere dayalı derin tarih/coğrafya bilgisi sorma. Şıklar arasında çok belirgin ve net farklar olsun, çeldiriciler çok kolay elenebilsin.',
-  medium: 'ORTA seviye: Hem doğrudan temel bilgi hem de yorumlamayı dengeli bir şekilde bir arada ölçen (yorum-bilgi karışık) standart KPSS zorluğunda sorular sor. Çeldiriciler makul düzeyde seçici olsun.',
-  hard: 'ZOR seviye (ÖSYM Tarzı): ÖSYM sınav formatına uygun olarak; sorduğun temel kavram, olay veya olguyu doğrudan isim vererek sormak yerine, onu çevreleyen 2 ya da 3 adet yan bilgi/ipucu (örneğin olayın gerçekleştiği tarih, ilgili bir antlaşma, etkili olan bir komutan veya yer şekli gibi yan bilgiler) ile tanımlayarak ve betimleyerek sor. Şıklar ve çeldiriciler birbirine çok yakın olsun, derinlemesine bilgi ve dikkatli okuma gerektirsin.',
-  extreme: 'UZMAN / AKADEMİK seviye: Son derece detaylı, derin akademik bilgi, karmaşık kavramsal analiz ve çok ince ayrıntı farkı gerektiren, en seçici adayları bile zorlayacak ileri düzey uzmanlık soruları sor. Şıklar birbirine o kadar yakın ve çeldiriciler o kadar profesyonelce hazırlanmış olsun ki, aday konuyu genel hatlarıyla bilse bile soruyu çözemesin, mutlaka dipnot seviyesinde en uç detaya hakim olması gereksin. Doğrudan ezber yerine, kavramlar arası sebep-sonuç ilişkilerini ve ince hukuki/idari/ekonomik ayrıntıları ölç.'
+  easy: 'KOLAY seviye: Soruları yalnızca temel kavramsal yorumlama, okuduğunu anlama ve basit mantık yürütme düzeyinde kurgula. Genel geçer, yüzeysel bilgileri hedefle. Seçenekler arasındaki farkları çok belirgin ve net tut; yanlış seçenekler kolayca elenebilecek uzak kavramlardan oluşsun.',
+  medium: 'ORTA seviye: Standart KPSS sınav zorluğunu hedefle. Doğrudan bilgi ölçen sorular ile kavramsal yorumlama gerektiren soruları dengeli bir şekilde harmanla. Seçenekleri makul düzeyde seçici ve kafa karıştırıcı terimlerden oluştur.',
+  hard: 'ZOR seviye (ÖSYM Tarzı): Derinlemesine bilgi ve dikkatli okuma gerektiren seçici sorular kurgula. Soruyu yazarken, hedeflediğin ana kavramı veya bilgiyi doğrudan adı ile sormak yerine; o bilginin yan özelliklerini, ilişkili olduğu diğer tarihleri, kurumları, coğrafi etkileri veya kanuni maddeleri ipucu olarak vererek dolaylı yoldan buldur. Seçenekleri birbirine çok yakın ve kavramsal olarak karıştırılabilecek gerçek KPSS terimlerinden seç.',
+  extreme: 'UZMAN / AKADEMİK seviye: En seçici adayları bile zorlayacak derecede detaylı, derin akademik ve dipnot seviyesindeki uç bilgileri ölçen uzmanlık soruları kurgula. Sorularda doğrudan en bilinen ana kavramı sormak yerine; metnin/dokümanın en ücra köşelerinde kalmış alt bentleri, kanun maddelerinin ince detaylarını, mikro düzeydeki coğrafi/tarihi/kurumsal istisnaları ve sebep-sonuç ilişkilerini hedef al. Seçenekler birbirine son derece yakın olsun; yanlış şıklar da dokümandaki diğer gerçek terimlerden seçilsin ki adayın soruyu çözebilmesi için konuya yüzeysel değil, tam bir uzman seviyesinde hakim olması gereksin.'
 };
 
 // KPSS Detaylı Müfredat Alt Başlıkları Havuzu (Syllabus Check-list)
@@ -290,18 +292,18 @@ function extractConceptsFromSyllabus(syllabusText: string): string[] {
  * Diverse question opening styles to prevent monotonous "Osmanlı Devleti'nde, X. yüzyılda..." patterns.
  */
 const QUESTION_ENTRY_STYLES = [
-  'Doğrudan soru kökü ile başla (örn: "Aşağıdakilerden hangisi...")',
+  'Doğrudan soru kökü ile başla',
   'Bir tarihi olayın sonuçlarını sorarak başla',
-  'Karşılaştırma formatında sor (örn: "I ve II numaralı yargılardan hangileri...")',
-  'Sebep-sonuç ilişkisi ile sor (örn: "... durumunun temel nedeni nedir?")',
-  'Bir kavramın tanımını vererek soruya gir (örn: "X olarak adlandırılan bu uygulama...")',
-  'Olumsuz soru kökü kullan (örn: "Aşağıdakilerden hangisi ... ile ilgili yanlış bir bilgidir?")',
+  'Karşılaştırma formatında sor',
+  'Sebep-sonuç ilişkisi ile sor',
+  'Bir kavramın tanımını vererek soruya gir',
+  'Olumsuz soru kökü kullan',
   'Kronolojik sıralama veya dönem karşılaştırması sor',
-  'Bir alıntı veya tarihi ifade ile başla (örn: "Bir tarihçi ... demiştir")',
-  'Doğrudan isim vererek başla (örn: "II. Mahmut döneminde kurulan...")',
-  'Verilen bilgilerden çıkarım yapma sorusu sor (örn: "Yukarıdaki bilgilere göre...")',
-  'Sonuçlardan hareketle olayı sordur (örn: "Bu gelişmelerin sonucunda...")',
-  'Coğrafi veya mekansal bağlam ile başla (örn: "Anadolu\'da/Balkanlarda...")',
+  'Bir alıntı veya tarihi ifade ile başla',
+  'Doğrudan isim vererek başla',
+  'Verilen bilgilerden çıkarım yapma sorusu sor',
+  'Sonuçlardan hareketle olayı sordur',
+  'Coğrafi veya mekansal bağlam ile başla',
 ];
 
 /**
@@ -357,11 +359,11 @@ function generateDistributionPlan(
         }
 
         return `📋 SORU DAĞILIM PLANI (DAR SAYFA ARALIĞI):
-KRİTİK: Sorular YALNIZCA sayfa ${totalStart} ile ${totalEnd} arasından üretilmelidir. Bu aralık dışındaki sayfalardan KESİNLİKLE soru üretme!
-ÖNEMLİ: Hedef sayfa aralığı dar olduğu için (${actualPageCount} sayfa) sorular sayfalara katı olarak bölünmemiştir. Ancak ${questionCount} sorunun tamamı bu sayfalar içerisindeki tamamen FARKLI cümlelerden, FARKLI paragraflardan, tablolardan veya ayrıntılardan üretilmelidir. Kesinlikle aynı bilgiyi tekrar etme!
+Hedef: Soruları sadece sayfa ${totalStart} ile ${totalEnd} arasından üretmeye odaklan. Bu aralık dışındaki sayfaları kapsam dışı bırak.
+Bilgi Yayılımı: Hedef sayfa aralığı dar olduğu için (${actualPageCount} sayfa) soruları sayfalara katı olarak bölmek yerine; ${questionCount} sorunun tamamını bu sayfalar içerisindeki tamamen farklı cümlelerden, farklı paragraflardan, tablolardan veya ayrıntılardan üret. Her soruda tamamen yeni ve benzersiz bir bilgiyi test et.
 ${lines.join('\n')}
 ${exclusionReminder}
-⚠️ BU PLAN ZORUNLUDUR: Sayfa ${totalStart}-${totalEnd} dışına KESİNLİKLE çıkma!`;
+Plan Takibi: Soruların tamamını sayfa ${totalStart}-${totalEnd} arasından seçmeye özen göster.`;
       } else {
         // Build page-level assignments that CYCLE within the range (never overflow!)
         // If 20 questions / 10 pages → each page gets ~2 questions but from different micro-concepts
@@ -400,13 +402,13 @@ ${exclusionReminder}
           lines.push(`- Soru ${i + 1} → ${pageLabel} | Giriş tarzı: "${style}"`);
         }
 
-        return `📋 SORU DAĞILIM PLANI (ZORUNLU SAYFA ATAMALARI):
-KRİTİK: Sorular YALNIZCA sayfa ${totalStart} ile ${totalEnd} arasından üretilmelidir. Bu aralık dışındaki sayfalardan KESİNLİKLE soru üretme!
-Her soru KESİNLİKLE kendisine atanmış sayfadaki bilgilerden üretilmelidir.
-${questionCount > actualPageCount ? `Not: Bazı sayfalardan birden fazla soru üretilecek. Bu durumda her soru o sayfadaki FARKLI bir mikro kavram/detay hakkında olmalıdır.` : ''}
+        return `📋 SORU DAĞILIM PLANI (SAYFA ATAMALARI):
+Hedef: Soruları sadece sayfa ${totalStart} ile ${totalEnd} arasından üretmeye odaklan. Bu aralık dışındaki sayfaları kapsam dışı bırak.
+Sayfa Eşleşmesi: Her soruyu kendisine atanmış olan sayfadaki bilgilerden üret.
+${questionCount > actualPageCount ? `Not: Bazı sayfalardan birden fazla soru üretilecektir. Bu durumda her sorunun o sayfadaki tamamen farklı bir mikro kavram/detay hakkında olmasını sağla.` : ''}
 ${lines.join('\n')}
 ${exclusionReminder}
-⚠️ BU PLAN ZORUNLUDUR: Sayfa ${totalStart}-${totalEnd} dışına KESİNLİKLE çıkma!`;
+Plan Takibi: Soruların tamamını sayfa ${totalStart}-${totalEnd} arasından seçmeye özen göster.`;
       }
     }
 
@@ -417,16 +419,16 @@ ${exclusionReminder}
       lines.push(`- Soru ${i + 1} \u2192 B\u00f6l\u00fcm: ${i + 1}/${questionCount} | Giri\u015f tarz\u0131: "${style}"`);
     }
 
-    return `\ud83d\udccb SORU DA\u011eILIM PLANI (ZORUNLU DOK\u00dcMAN B\u00d6L\u00dcM ATAMALARI):
-PDF dok\u00fcman\u0131n\u0131 toplam ${questionCount} e\u015fit b\u00f6l\u00fcme ay\u0131r. Her soru KES\u0130NL\u0130KLE farkl\u0131 bir b\u00f6l\u00fcmden \u00fcretilmelidir.
-\u00d6rnek: Dok\u00fcman 60 sayfa ve ${questionCount} soru isteniyorsa, her ${Math.max(1, Math.floor(60 / questionCount))} sayfadan 1 soru \u00fcret.
+    return `📋 SORU DAĞILIM PLANI (DOKÜMAN BÖLÜM ATAMALARI):
+PDF dokümanını toplam ${questionCount} eşit bölüme ayır ve her soruyu farklı bir bölümden üretmeye odaklan.
+Örnek: Doküman 60 sayfa ve ${questionCount} soru isteniyorsa, her ${Math.max(1, Math.floor(60 / questionCount))} sayfadan ortalama 1 soru üret.
 
 ${lines.join('\n')}
 ${exclusionReminder}
-\u26a0\ufe0f BU PLAN ZORUNLUDUR:
-- Dok\u00fcman\u0131n ilk sayfalar\u0131na veya tek bir b\u00f6l\u00fcm\u00fcne y\u0131\u011f\u0131lma YASAKTIR!
-- Her soru dok\u00fcman\u0131n farkl\u0131 bir fiziksel b\u00f6lgesinden (farkl\u0131 sayfalardan) gelmelidir.
-- Dok\u00fcman\u0131n SON YARISI en az ${Math.ceil(questionCount / 2)} soru i\u00e7ermelidir \u2014 modelin ilk sayfalara tak\u0131l\u0131p kalmas\u0131 engellenmektedir.`;
+Dağılım Rehberi:
+- Soruları dokümanın geneline homojen olarak dağıt, tek bir bölüme yığılmaktan kaçın.
+- Her sorunun dokümanın farklı bir fiziksel bölgesinden (farklı sayfalardan) gelmesini sağla.
+- Dokümanın ikinci yarısından (son yarısından) en az ${Math.ceil(questionCount / 2)} adet soru üretmeye özen göstererek dengeli bir yayılım yakala.`;
   }
 
   // Topic/Syllabus mode: extract concepts and distribute
@@ -473,11 +475,11 @@ ${exclusionReminder}
     lines.push(`- Soru ${i + 1} → Konu: "${selected[i].topic}" | Kavram: "${selected[i].concept}" | Giriş tarzı: "${style}"`);
   }
 
-  return `📋 SORU DAĞILIM PLANI (ZORUNLU KAVRAM ATAMALARI):
-Her soru KESİNLİKLE kendisine atanmış kavram hakkında olmalıdır. Sırayı değiştirmek serbesttir ancak başka bir kavramdan soru üretmek YASAKTIR.
+  return `📋 SORU DAĞILIM PLANI (KAVRAM ATAMALARI):
+Her soruyu kendisine atanmış kavramı ölçecek şekilde tasarla. Soruların sıralamasını dilediğin gibi karıştırabilirsin, ancak her sorunun bu listedeki benzersiz kavramları eşleştirmesini sağla.
 ${lines.join('\n')}
 ${exclusionReminder}
-⚠️ BU PLAN ZORUNLUDUR: Yukarıdaki her satır bir soruyu temsil eder. Her soru kendi kavramından üretilmeli ve farklı bir giriş tarzı kullanmalıdır.`;
+Plan Takibi: Yukarıdaki her satır bir soruyu temsil eder. Her soruyu kendi kavramı çerçevesinde üret ve her birinde farklı bir giriş tarzı kullan.`;
 }
 
 /**
@@ -493,7 +495,8 @@ export async function generateQuiz(
   geminiFileUri?: string | null,
   pdfPageRange?: string | null,
   pdfName?: string | null,
-  excludeQuestionTexts: string[] = []
+  excludeQuestionTexts: string[] = [],
+  focusSubtopics: string[] = []
 ): Promise<Quiz> {
   if (!apiKey) {
     throw new Error('API anahtarı bulunamadı. Lütfen Ayarlar ekranından API anahtarınızı girin.');
@@ -508,6 +511,15 @@ export async function generateQuiz(
 
   const topicsString = topics.join(', ');
   const difficultyInstruction = DIFFICULTY_PROMPTS[difficulty];
+
+  // Dynamic temperature based on difficulty level
+  const difficultyTemperature: Record<DifficultyLevel, number> = {
+    easy: 0.4,
+    medium: 0.55,
+    hard: 0.7,
+    extreme: 0.85,
+  };
+  const temperature = difficultyTemperature[difficulty];
 
   // Extract syllabus sub-topics details based on selected topics (using fuzzy key matcher)
   let syllabusContext = '';
@@ -563,110 +575,184 @@ export async function generateQuiz(
   const varietyAndCoverageMandate = `
 ÇEŞİTLİLİK VE DETAYLI MÜFREDAT KAPSAMI KURALI:
 1. Ürettiğin ${questionCount} sorunun her biri müfredat detaylarında geçen **tamamen farklı, bağımsız ve benzersiz** bir mikro kavram/alt başlık ile ilgili olmalıdır.
-2. Kesinlikle aynı mikro kavramdan/alt başlıktan birden fazla soru üretme! (Örneğin; 1 soru Kurultay hakkındaysa, diğer sorular ikili teşkilat, kut anlayışı, destanlar veya uygurların kültürel mirası gibi tamamen farklı ve bağımsız diğer kavramlardan olmalıdır.)
-3. Müfredat listesindeki kavramları dengeli, geniş ve adil bir şekilde tarayarak her soru için farklı bir odak seç. Kolaycı davranıp en popüler 2-3 kavramı tekrar edip durma. Kıyıda köşede kalmış, derin ÖSYM tarzı KPSS detaylarına da mutlaka yer ver.
-4. DİL VE YAPI ŞABLONU TEKRAR YASAĞI (MONOTONLUK ENGELİ): Soruların başlangıç ve cümle yapılarını sürekli aynı şablonla kurma! (Örneğin; bir sorunun başında "Osmanlı Devleti'nde, 17. yüzyılda..." veya "Osmanlı Devleti'nde..." diyorsan, diğer soruların başına kesinlikle aynı kalıpları koyma! Soruları farklı dil yapılarıyla, doğrudan soru kökleriyle veya farklı giriş tarzlarıyla sor. Her sorunun tümce yapısı ve dili birbirinden farklı olmalı, monoton bir ritim oluşturmamalıdır.)
-5. ARD ARDA AYNY KONU YIĞILMA YASAĞI (KONU KARIŞTIRMA / SHUFFLE): Aynı konudan (örneğin toprak sistemi, divan üyeleri veya padişah ıslahatları) olan soruları KESİNLİKLE art arda sıralama! Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda 2 tane toprak sorusu veya 2 tane 17. yüzyıl sorusu çözmemelidir. Konular test geneline homojen olarak dağıtılmalıdır.
-6. GİRİŞ TARZI / ŞABLON METNİ KAÇAK ENGELİ: Dağılım planındaki "Giriş tarzı" yönergelerini (örn: "Doğrudan soru kökü ile başla", "Bir tarihi olayın sonuçlarını sorarak başla", "Bir alıntı veya tarihi ifade ile başla", "Kronolojik sıralama veya dönem karşılaştırması sor" vb.) KESİNLİKLE soru metninin ("question_text") içine kopyalama, ekleme veya başlık/ön ek olarak yazma! Bu ifadeler sadece sorunun kurgu mantığı için kılavuzdur. Sorunun kendisi doğrudan doğal bir cümle ile başlamalıdır.
-7. ALINTI/PARAGRAF BİLGİ KAÇAK YASAĞI (KENDİNDEN CEVAPLI SORU YASAĞI): Eğer alıntı vererek soruyorsan (örn: "Bir tarihçi ... demiştir"), sorunun doğru cevabını alıntının/paragrafın içerisine KESİNLİKLE yazma! Alıntı sadece bir bağlam veya ipucu vermelidir, sorunun cevabı ise bu bağlamdan hareketle bilgi kullanılarak çözülmelidir. Örneğin, içinde cevabı barındıran basit sorular (örn: "Bir tarihçi '...köylerin yöneticisi Muhtar olmuştur' demiştir. Buna göre bu dönemde köylerin yöneticisi kimdir?") KESİNLİKLE yasaktır.
-8. MİKRO KAVRAM HASSASİYETİ (SUBTOPIC KURALI): Ürettiğin her sorunun JSON çıktısındaki "subtopic" (alt konu) alanını son derece spesifik, benzersiz ve mikro düzeyde bir kavram olarak doldur (örn: "Osmanlı Devleti Kültür ve Uygarlığı" veya "Tarih" gibi genel ifadeler KESİNLİKLE yazma! Bunun yerine "Tereke Defteri", "Muaccele", "Sabuncuoğlu Şerefeddin", "Beşik Ulemalığı" gibi spesifik kavramı yaz). Bu alan, gelecekteki testlerde bu konunun tekrar sorulmasını engellemek için kullanılacaktır.
-9. MANTIK HATASI ENGELİ (YUKARIDAKİLERDEN HANGİSİ): Soru metni "Yukarıdakilerden hangisi..." veya "Buna göre..." diye başlıyor/bitiyorsa, metnin en üstünde MUTLAKA okunacak öncüller (I. ..., II. ..., III. ...) veya referans bir paragraf/bilgi bulunmak ZORUNDADIR. Eğer soru kökünün hemen üstünde okunacak bir öncül yoksa "Yukarıdakilerden hangisi" ifadesini ASLA kullanma, doğrudan "Aşağıdakilerden hangisi" diyerek sor.
-10. ÖNCÜLLÜ (I, II, III NUMARALI) SORULARDA MUTLAK KURAL: Eğer öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini KESİNLİKLE soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise SADECE "A) Yalnız I", "B) Yalnız II", "C) I ve II", "D) II ve III", "E) I, II ve III" gibi klasik kombinasyonlardan oluşmalıdır. KESİNLİKLE öncüllerin kendisini seçeneklerin (A, B, C, D, E) içine tek tek dağıtıp diğer şıkları da "I ve II doğrudur" şeklinde kurgulama! Bu durum soruyu mantıksız ve hatalı kılar.
-11. ÇELDİRİCİ VE SEÇENEK YAZIM KURALLARI (YÜKSEK SEÇİCİLİK):
-   - SEÇENEK TUTARLILIĞI: Yanış seçenekler (A, B, C, D, E şıkları) kesinlikle uydurma, saçma veya sorulan konunun/dönemin tamamen dışındaki alakasız dönemlerden seçilmemelidir. Örneğin, İslamiyet Öncesi Tarih soruluyorsa, çeldiriciler de İslamiyet Öncesi döneme ait diğer kavramlar veya devletler olmalıdır; araya Osmanlı Devleti veya İnkılap Tarihi kavramları karıştırılmamalıdır.
-   - UZUNLUK VE GRAMER DENGESİ: Doğru şık, diğer şıklardan belirgin şekilde daha uzun, detaylı veya farklı bir cümle yapısıyla kurulmamalıdır. Şıkların hepsi benzer uzunlukta ve benzer ifade tarzına sahip olmalıdır ki doğru cevap sırıtmasın.
-   - GÜÇLÜ ÇELDİRME GÜCÜ: Şıklardan en az iki tanesi, doğru cevaba kavramsal veya kronolojik olarak çok yakın, öğrencilerin en sık karıştırdığı gerçek terimler arasından seçilerek çeldirme gücü yüksek tutulmalıdır. Kolayca elenebilecek "sırf şık olsun diye yazılmış" alakasız seçeneklerden kaçınılmalıdır.
-   - TEK BİR DOĞRU CEVAP ZORUNLULUĞU (KESİN KANIT KURALI): Şıklardan sadece ve sadece bir tanesi kesinlikle doğru cevap olmalıdır. Diğer 4 seçenek (çeldiriciler) doğru seçeneğe bilgi ve mantık olarak ne kadar yakın veya benzer görünürse görünsün, soru kökünde sorulan durum açısından KESİNLİKLE VE BİLİMSEL OLARAK YANLIŞ olmalıdır. İki şıkkın birden doğru kabul edilebileceği veya yoruma göre değişebilen hiçbir muğlak/belirsiz soru kurgulanmamalıdır. Doğru cevap tartışmasız tek olmalıdır.
+2. Kavram Çeşitliliği: Her sorunun testteki diğer tüm sorulardan bağımsız ve farklı bir kazanımı/kavramı ölçtüğünden emin ol. Aynı konunun farklı yönlerini sormak yerine, konu havuzundaki tamamen farklı alt başlıklara odaklan.
+3. Müfredattaki kavramları dengeli, geniş ve adil bir şekilde tarayarak her soru için farklı bir odak seç. Kolaycı davranıp en popüler 2-3 kavramı tekrar edip durmak yerine, kıyıda köşede kalmış, derin ÖSYM tarzı KPSS detaylarına da mutlaka yer ver.
+4. Cümle Yapısı Çeşitliliği: Soruların başlangıç ve cümle yapılarını her soruda farklılaştır. Soruları farklı tümce yapılarıyla, farklı kelimelerle ve giriş tarzlarıyla sor. Her sorunun tümce yapısı ve dili birbirinden farklı olmalı, monoton bir ritim oluşturmaktan kaçın.
+5. Konu Dağılımı (Shuffle): Benzer konulardan olan soruları testin geneline homojen olarak dağıt. Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda benzer temada sorular yerine her soruda farklı bir konuyu teyit etmelidir.
+6. Kılavuz Metni Koruma: Dağılım planındaki kurgu yönergelerini sadece sorunun tasarımı için arka planda kullan. Soru metninin kendisini doğrudan doğal ve yalın bir cümle ile başlat.
+7. Alıntı ve Paragraf Koruma: Eğer alıntı veya paragraf vererek soruyorsan, sorunun doğru cevabını metnin içerisinde doğrudan kelime kelime geçirmek yerine; metnin sadece bir bağlam veya ipucu vermesini sağla. Sorunun cevabını, bu bağlamdan hareketle bilgi kullanılarak çözülecek şekilde kurgula. İçinde cevabı barındıran basit sorulardan uzak dur.
+8. Mikro Kavram Hassasiyeti (Subtopic): Ürettiğin her sorunun JSON çıktısındaki "subtopic" (alt konu) alanını son derece spesifik, benzersiz ve mikro düzeyde bir kavram olarak doldur. Genel kategori veya ders başlıkları yerine, doğrudan o sorunun ölçtüğü spesifik olay, kurum, yer şekli veya kanun maddesinin adını yaz. Bu alan, gelecekteki testlerde bu konunun tekrar sorulmasını engellemek için kullanılacaktır.
+9. Giriş ve Referans Metin Uyumu (Mantık Doğruluğu): 
+   - Soruyu kurarken referans kelimeler ('Buna göre', 'Yukarıdaki bilgilere göre', 'Bu gelişmelerin sonucunda' vb.) kullanmak istiyorsan, bu ifadeleri yazmadan hemen önce soru metninin ("question_text") en başına o duruma açıklık getiren kısa bir bilgi paragrafı, durum açıklaması veya öncül listesi ekle.
+   - Herhangi bir öncül veya paragraf eklemeden doğrudan soru soracaksan, soru cümlesini bağımsız, net ve kendi içinde tam açıklayıcı bir soru köküyle başlat.
+10. Öncüllü Sorularda Standart Biçim: Öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise sadece klasik kombinasyonlardan ("Yalnız I", "I ve II" vb.) oluşmalıdır. Seçeneklerde öncüllerin metinlerini tekrarlamaktan kaçın. Soru metninde öncülleri listelemeyi unutmadan açıkça belirt.
+11. Çeldirici ve Seçenek Yazım Kuralları (Yüksek Seçicilik):
+    - Seçenek Tutarlılığı: Tüm yanlış seçenekleri (çeldiricileri) sorunun ait olduğu konuyla uyumlu, gerçek KPSS terimleri arasından seç. Uydurma, saçma veya konunun tamamen dışındaki alakasız kavramları seçeneklere koymaktan kaçın.
+    - Uzunluk ve Gramer Dengesi: Doğru şık, diğer şıklardan benzer uzunlukta ve benzer ifade tarzına sahip olmalıdır ki doğru cevap sırıtmasın.
+    - Güçlü Çeldirme Gücü: Şıklardan en az iki tanesini doğru cevaba kavramsal veya kronolojik olarak çok yakın, öğrencilerin en sık karıştırdığı gerçek terimler arasından seçerek çeldirme gücünü yüksek tut.
+    - Tek Doğru Cevap Güvencesi: Seçeneklerden sadece ve sadece bir tanesinin kesinlikle doğru cevap olmasını sağla. Diğer 4 seçenek (çeldiriciler), doğru seçeneğe bilgi ve mantık olarak ne kadar yakın görünürse görünsün, soru kökünde sorulan durum açısından kesin olarak yanlış olmalıdır. Çelişkili veya yoruma göre değişebilen muğlak sorular yerine, doğru cevabı bilimsel olarak tartışmasız tek olan sorular tasarla.
+12. Geçmiş Soruları Filtreleme: Aşağıda "Daha önce sorulan kavramlar" ve "Son çözülen sorular" başlıkları altında listelenen konu başlıklarının ve soruların dışındaki yeni, farklı ve özgün bilgilere odaklan. Bu listeleri bir tasarım dışı listesi olarak gör ve buradaki kavramları elenmiş say.
 `;
 
   const pdfVarietyAndCoverageMandate = `
 ÇEŞİTLİLİK, DOKÜMANIN DERİNLİKLERİNE İNME VE YAYILIM KURALI:
 1. Ürettiğin ${questionCount} sorunun her biri PDF dokümanındaki **tamamen farklı ve bağımsız** bölümler, sayfalar, paragraflar ve mikro kavramlar ile ilgili olmalıdır.
 ${isNarrowRange 
-  ? `2. KESİNLİKLE her sorunun o sayfalardaki tamamen farklı paragraflardan, farklı cümlelerden ve farklı detaylardan üretildiğinden emin ol. Sayfa aralığı çok dar olduğu için (${actualPageCount} sayfa) aynı sayfadan çok sayıda soru üretilecektir; ancak kendi içinde tekrara düşmek kesinlikle yasaktır!`
-  : `2. KESİNLİKLE aynı sayfadan, aynı paragraftan veya aynı mikro kavramdan birden fazla soru üretme! Dokümanın geneline yayılarak geniş, zengin ve çeşitli bir bilgi kapsamı sağla.`
+  ? `2. Her sorunun o sayfalardaki tamamen farklı paragraflardan, farklı cümlelerden ve farklı detaylardan üretildiğinden emin ol. Sayfa aralığı çok dar olduğu için (${actualPageCount} sayfa) aynı sayfadan çok sayıda soru üretilecektir; ancak kendi içinde tekrara düşmekten kaçın!`
+  : `2. Her soruyu tamamen farklı bir sayfadan, farklı bir paragraftan veya farklı bir mikro kavramdan üretmeye özen göster. Dokümanın geneline yayılarak geniş, zengin ve çeşitli bir bilgi kapsamı sağla.`
 }
-3. PDF dokümanının ilk sayfalarında veya en belirgin giriş kısımlarında sıkışıp kalma! Dokümanın orta ve son kısımlarındaki derin detayları, tablolardaki küçük bilgileri, dipnotları ve kritik ayrıntıları özellikle tara ve buralardan benzersiz sorular üret.
-4. Kendi içinde tekrara düşme, her sorunun testteki diğer tüm sorulardan tamamen farklı bir bilgi/beceriyi ölçmesini sağla.
-5. DOKÜMANDAKİ YILDIZLAR VE SEÇİCİLİK: Dokümanda yer alan yıldızlara (*), özel işaretlemelere veya vurgulu kısımlara takılıp kalma! Yıldızlı kısımlar daha önce sorulmuş ve tüketilmiş olabilir. Dokümanın geri kalan tüm düz paragraflarını, tablolarını ve detaylarını da eşit şekilde tarayarak soru üret. Tekrara düşmektense, dokümanın daha önce hiç soru yazılmamış diğer bölümlerine odaklan.
+3. PDF dokümanının ilk sayfalarında veya en belirgin giriş kısımlarında sınırlı kalmak yerine, belgenin ortalarındaki ve sonlarındaki sayfaları da tam olarak analiz edip derin detayları, tablolardaki küçük bilgileri ve dipnotları özellikle tara ve benzersiz sorular üret.
+4. Kendi içinde tekrara düşmekten kaçın, her sorunun testteki diğer tüm sorulardan tamamen farklı bir bilgi/beceriyi ölçmesini sağla.
+5. Dokümandaki Detayları Dengeli Tarama: Dokümanda yer alan yıldızlara (*), özel işaretlemelere veya vurgulu kısımlara kilitlenmek yerine, belgenin geri kalan tüm düz paragraflarını, tablolarını ve detaylarını da eşit şekilde tarayarak soru üret. Tekrara düşmektense, dokümanın daha önce hiç soru yazılmamış diğer bölümlerine odaklan.
 ${isNarrowRange 
-  ? `6. DAR ARALIK ÖZEL KURALI: Sayfa aralığı çok dar olduğu için (${actualPageCount} sayfa) her sayfadan çok sayıda soru üretilmesi gerekecektir. Bu durumda, her bir sorunun o sayfalardaki tamamen farklı paragraflardan, farklı cümlelerden ve farklı detaylardan üretildiğinden emin ol. Aynı konuyu/soruyu hafifçe değiştirip tekrar sorma, her soru yeni bir bilgiyi ölçsün.`
-  : `6. SAYFA DAĞILIMI VE DERİN TARAMA: Soruları dokümanın sayfalarına dengeli bir şekilde dağıt. Dokümanı sayfa sayısına göre kabaca eşit bölümlere ayır ve her bölümden eşit sayıda soru üretmeye çalış. Örneğin 10 sayfalık bir dokümandan 20 soru isteniyorsa, her sayfadan ortalama 2 soru üret. Tek bir sayfaya veya bölüme yığılma yapma.`
+  ? `6. Dar Aralık Özel Kuralı: Sayfa aralığı çok dar olduğu için (${actualPageCount} sayfa) her sayfadan çok sayıda soru üretilmesi gerekecektir. Bu durumda, her bir sorunun o sayfalardaki tamamen farklı paragraflardan, farklı cümlelerden ve farklı detaylardan üretildiğinden emin ol. Aynı konuyu/soruyu hafifçe değiştirip tekrar sorma almak yerine, her soruyle yeni bir bilgiyi ölç.`
+  : `6. Sayfa Dağılımı ve Derin Tarama: Soruları dokümanın sayfalarına dengeli bir şekilde dağıt. Dokümanı sayfa sayısına göre kabaca eşit bölümlere ayır ve her bölümden eşit sayıda soru üretmeye çalış. Tek bir sayfaya veya bölüme yığılma yapmaktan kaçın.`
 }
-7. DİL VE YAPI ŞABLONU TEKRAR YASAĞI (MONOTONLUK ENGELİ): Soruların başlangıç ve cümle yapılarını sürekli aynı şablonla kurma! (Örneğin; bir sorunun başında "Osmanlı Devleti'nde, 17. yüzyılda..." veya "Osmanlı Devleti'nde..." diyorsan, diğer soruların başına kesinlikle aynı kalıpları koyma! Soruları farklı dil yapılarıyla, doğrudan soru kökleriyle veya farklı giriş tarzlarıyla sor. Her sorunun tümce yapısı ve dili birbirinden farklı olmalı, monoton bir ritim oluşturmamalıdır.)
-8. ARD ARDA AYNI KONU YIĞILMA YASAĞI (KONU KARIŞTIRMA / SHUFFLE): Aynı konudan (örneğin toprak sistemi, divan üyeleri veya padişah ıslahatları) olan soruları KESİNLİKLE art arda sıralama! Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda 2 tane toprak sorusu veya 2 tane 17. yüzyıl sorusu çözmemelidir. Konular test geneline homojen olarak dağıtılmalıdır.
-9. GİRİŞ TARZI / ŞABLON METNİ KAÇAK ENGELİ: Dağılım planındaki "Giriş tarzı" yönergelerini (örn: "Doğrudan soru kökü ile başla", "Bir tarihi olayın sonuçlarını sorarak başla", "Bir alıntı veya tarihi ifade ile başla", "Kronolojik sıralama veya dönem karşılaştırması sor" vb.) KESİNLİKLE soru metninin ("question_text") içine kopyalama, ekleme veya başlık/ön ek olarak yazma! Bu ifadeler sadece sorunun kurgu mantığı için kılavuzdur. Sorunun kendisi doğrudan doğal bir cümle ile başlamalıdır.
-10. ALINTI/PARAGRAF BİLGİ KAÇAK YASAĞI (KENDİNDEN CEVAPLI SORU YASAĞI): Eğer alıntı vererek soruyorsan (örn: "Bir tarihçi ... demiştir"), sorunun doğru cevabını alıntının/paragrafın içerisine KESİNLİKLE yazma! Alıntı sadece bir bağlam veya ipucu vermelidir, sorunun cevabı ise bu bağlamdan hareketle bilgi kullanılarak çözülmelidir. Örneğin, içinde cevabı barındıran basit sorular (örn: "Bir tarihçi '...köylerin yöneticisi Muhtar olmuştur' demiştir. Buna göre bu dönemde köylerin yöneticisi kimdir?") KESİNLİKLE yasaktır.
-11. MANTIK HATASI ENGELİ (YUKARIDAKİLERDEN HANGİSİ): Soru metni "Yukarıdakilerden hangisi..." veya "Buna göre..." diye başlıyor/bitiyorsa, metnin en üstünde MUTLAKA okunacak öncüller (I. ..., II. ..., III. ...) veya referans bir paragraf/bilgi bulunmak ZORUNDADIR. Eğer soru kökünün hemen üstünde okunacak bir öncül yoksa "Yukarıdakilerden hangisi" ifadesini ASLA kullanma, doğrudan "Aşağıdakilerden hangisi" diyerek sor.
-12. ÖNCÜLLÜ (I, II, III NUMARALI) SORULARDA MUTLAK KURAL: Eğer öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini KESİNLİKLE soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise SADECE "A) Yalnız I", "B) Yalnız II", "C) I ve II", "D) II ve III", "E) I, II ve III" gibi klasik kombinasyonlardan oluşmalıdır. KESİNLİKLE öncüllerin kendisini seçeneklerin (A, B, C, D, E) içine tek tek dağıtıp diğer şıkları da "I ve II doğrudur" şeklinde kurgulama! Bu durum soruyu mantıksız ve hatalı kılar.
+7. DİL VE YAPI ŞABLONU TEKRAR YASAĞI (MONOTONLUK ENGELİ): Soruların başlangıç ve cümle yapılarını sürekli aynı şablonla kurmak yerine; soruları farklı tümce yapılarıyla, farklı kelimelerle ve giriş tarzlarıyla sor. Her sorunun tümce yapısı ve dili birbirinden farklı olmalı, monoton bir ritim oluşturmaktan kaçın.
+8. ARD ARDA AYNI KONU YIĞILMA YASAĞI (KONU KARIŞTIRMA / SHUFFLE): Benzer konulardan olan soruları testin geneline homojen olarak dağıt. Soruların konularını ve ölçtüğü alanları test içerisinde tamamen karıştır, harmanla ve rastgele dağıt. Kullanıcı art arda benzer temada sorular yerine her soruda farklı bir konuyu teyit etmelidir.
+9. GİRİŞ TARZI / ŞABLON METNİ KAÇAK ENGELİ: Dağılım planındaki kurgu yönergelerini sadece sorunun tasarımı için arka planda kullan. Soru metninin kendisini doğrudan doğal ve yalın bir cümle ile başlat.
+10. ALINTI/PARAGRAF BİLGİ KAÇAK YASAĞI (KENDİNDEN CEVAPLI SORU YASAĞI): Eğer alıntı vererek soruyorsan, sorunun doğru cevabını alıntının/paragrafın içerisine yazmak yerine; alıntının sadece bir bağlam veya ipucu vermesini sağla. Sorunun cevayı, bu bağlamdan hareketle bilgi kullanılarak çözülcek şekilde kurgula. İçinde cevabı barındıran basit sorulardan uzak dur.
+11. GİRİŞ AND REFERANS METİN UYUMU (MANTIK DOĞRULUĞU): 
+    - Soruyu kurarken referans kelimeler ('Buna göre', 'Yukarıdaki bilgilere göre', 'Bu gelişmelerin sonucunda' vb.) kullanmak istiyorsan, bu ifadeleri yazmadan hemen önce soru metninin ("question_text") en başına o duruma açıklık getiren kısa bir bilgi paragrafı, durum açıklaması veya öncül listesi ekle.
+    - Herhangi bir öncül veya paragraf eklemeden doğrudan soru soracaksan, soru cümlesini bağımsız, net ve kendi içinde tam açıklayıcı bir soru köküyle başlat.
+12. ÖNCÜLLÜ (I, II, III NUMARALI) SORULARDA MUTLAK KURAL: Eğer öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise sadece klasik kombinasyonlardan ("Yalnız I", "I ve II" vb.) oluşmalıdır. Seçeneklerde öncüllerin metinlerini tekrarlamaktan kaçın. Soru metninde öncülleri listelemeyi unutmadan açıkça belirt.
 13. ÇELDİRİCİ VE SEÇENEK YAZIM KURALLARI (YÜKSEK SEÇİCİLİK):
-   - SEÇENEK TUTARLILIĞI: Yanlış seçenekler (A, B, C, D, E şıkları) kesinlikle uydurma, saçma veya sorulan konunun/dönemin tamamen dışındaki alakasız dönemlerden seçilmemelidir. Örneğin, İslamiyet Öncesi Tarih soruluyorsa, çeldiriciler de İslamiyet Öncesi döneme ait diğer kavramlar veya devletler olmalıdır; araya Osmanlı Devleti veya İnkılap Tarihi kavramları karıştırılmamalıdır.
-   - UZUNLUK VE GRAMER DENGESİ: Doğru şık, diğer şıklardan belirgin şekilde daha uzun, detaylı veya farklı bir cümle yapısıyla kurulmamalıdır. Şıkların hepsi benzer uzunlukta ve benzer ifade tarzına sahip olmalıdır ki doğru cevap sırıtmasın.
-   - GÜÇLÜ ÇELDİRME GÜCÜ: Şıklardan en az iki tanesi, doğru cevaba kavramsal veya kronolojik olarak çok yakın, öğrencilerin en sık karıştırdığı gerçek terimler arasından seçilerek çeldirme gücü yüksek tutulmalıdır. Kolayca elenebilecek "sırf şık olsun diye yazılmış" alakasız seçeneklerden kaçınılmalıdır.
-   - TEK BİR DOĞRU CEVAP ZORUNLULUĞU (KESİN KANIT KURALI): Şıklardan sadece ve sadece bir tanesi kesinlikle doğru cevap olmalıdır. Diğer 4 seçenek (çeldiriciler) doğru seçeneğe bilgi ve mantık olarak ne kadar yakın veya benzer görünürse görünsün, soru kökünde sorulan durum açısından KESİNLİKLE VE BİLİMSEL OLARAK YANLIŞ olmalıdır. İki şıkkın birden doğru kabul edilebileceği veya yoruma göre değişebilen hiçbir muğlak/belirsiz soru kurgulanmamalıdır. Doğru cevap tartışmasız tek olmalıdır.
+    - Seçenek Tutarlılığı: Tüm yanlış seçenekleri (çeldiricileri) sorunun ait olduğu konuyla uyumlu, gerçek KPSS terimleri arasından seç. Uydurma, saçma veya konunun tamamen dışındaki alakasız kavramları seçeneklere koymaktan kaçın.
+    - Uzunluk ve Gramer Dengesi: Doğru şık, diğer şıklardan benzer uzunlukta ve benzer ifade tarzına sahip olmalıdır ki doğru cevap sırıtmasın.
+    - Güçlü Çeldirme Gücü: Şıklardan en az iki tanesini doğru cevaba kavramsal veya kronolojik olarak çok yakın, öğrencilerin en sık karıştırdığı gerçek terimler arasından seçerek çeldirme gücünü yüksek tut.
+    - Tek Doğru Cevap Güvencesi: Seçeneklerden sadece ve sadece bir tanesinin kesinlikle doğru cevap olmasını sağla. Diğer 4 seçenek (çeldiriciler), doğru seçeneğe bilgi ve mantık olarak ne kadar yakın görünürse görünsün, soru kökünde sorulan durum açısından kesin olarak yanlış olmalıdır. Çelişkili veya yoruma göre değişebilen muğlak sorular yerine, doğru cevabı bilimsel olarak tartışmasız tek olan sorular tasarla.
+14. Geçmiş Soruları Filtreleme: Aşağıda "Daha önce sorulan kavramlar" ve "Son çözülen sorular" başlıkları altında listelenen konu başlıklarının ve soruların dışındaki yeni, farklı ve özgün bilgilere odaklan. Bu listeleri bir tasarım dışı listesi olarak gör ve buradaki kavramları elenmiş say.
 `;
 
   const explanationLength: Record<DifficultyLevel, string> = {
-  easy: '"rational_explanation" (açıklama) kısmını KESİNLİKLE maksimum 1-2 cümle ile son derece kısa ve öz tut, yalnızca cevabın neden doğru olduğunu açıkla.',
-  medium: '"rational_explanation" (açıklama) kısmını 2-3 cümle ile öz tut, cevabın neden doğru olduğunu ve yanlış şıkların neden yanlış olduğunu kısaca açıkla.',
-  hard: '"rational_explanation" (açıklama) kısmını 3-5 cümle ile detaylı bir şekilde yaz. Doğru cevabın neden doğru olduğunu, yanlış şıkların neden yanlış olduğunu ve konunun KPSS bağlamındaki önemini açıkla.',
-  extreme: '"rational_explanation" (açıklama) kısmını 3-5 cümle ile akademik düzeyde detaylı yaz. Doğru cevabın neden doğru olduğunu, her yanlış şıkkın neden yanlış olduğunu, kavramlar arası ince farkları ve ÖSYM tuzaklarını açıkla.'
-};
+    easy: '"rational_explanation" (açıklama) kısmını maksimum 1-2 cümle ile son derece kısa ve öz tut, yalnızca cevabın neden doğru olduğunu açıkla.',
+    medium: '"rational_explanation" (açıklama) kısmını 2-3 cümle ile öz tut, cevabın neden doğru olduğunu ve yanlış şıkların neden yanlış olduğunu kısaca açıkla.',
+    hard: '"rational_explanation" (açıklama) kısmını 3-5 cümle ile detaylı bir şekilde yaz. Doğru cevabın neden doğru olduğunu, yanlış şıkların neden yanlış olduğunu ve konunun KPSS bağlamındaki önemini açıkla.',
+    extreme: '"rational_explanation" (açıklama) kısmını 3-5 cümle ile akademik düzeyde detaylı yaz. Doğru cevabın neden doğru olduğunu, her yanlış şıkkın neden yanlış olduğunu, kavramlar arası ince farkları ve ÖSYM tuzaklarını açıkla.'
+  };
 
-const speedConstraints = `
-HIZ VE KALİTE TALİMATI:
-1. Soru metinlerini ve seçenekleri gereksiz yere uzatma. Net, açık ve doğrudan bir dil kullan.
-2. ${explanationLength[difficulty]}
-3. Sorularda her şık benzersiz olsun. Tekrarlayan ifadeler kullanma.
+  const speedConstraints = `
+KURALLAR:
+1. SUBTOPIC ALANI: "subtopic" alanını çok spesifik, mikro düzeyde bir kavramla doldur. Genel kategori veya ders başlıkları yerine, doğrudan o sorunun ölçtüğü spesifik olay, kurum, yer şekli veya kanun maddesinin adını yaz.
+2. SORU ÇEŞİTLİLİĞİ: Soruların en az %30'unun analiz ve yorum gücünü ölçmesini sağla:
+   - Doğrudan soru formatı (en fazla %40 oranında tut)
+   - Yanlış olanı bulma formatı (en az 2 soru ekle)
+   - Öncüllü sorular (en az 2 soru): Öncüllü sorularda en az 3 öncül (I., II., III.) kullan. Öncülleri soru metninin başında yaz, şıklara klasik kombinasyonlar ("Yalnız I", "I ve II" vb.) koy.
+   - Sebep-sonuç, karşılaştırma veya yorum sorusu (en az 2 soru ekle)
+3. ŞIK DENGESİ: Doğru cevapları A, B, C, D, E harfleri arasında dengeli dağıt (her harf en az 1, en fazla 3 kez doğru olsun). Tüm şıkların uzunluklarını birbirine benzer tut.
+4. SORU KARIŞTIRMA: Soruların konularını ve sıralamasını tamamen karıştır. Benzer konulardan olan soruları arka arkaya dizmek yerine aralara dağıt.
+5. TEK DOĞRU CEVAP: Her sorunun net ve tek bir doğru cevabı olmasını sağla. Açıklamada neden diğer şıkların yanlış olduğunu belirt.
+6. ÇELDİRİCİLER: Yanlış şıkları sorulan konuyla aynı alana ait gerçek ve bilimsel terimlerden seç.
+7. GİRİŞ ÇEŞİTLİLİĞİ: Her sorunun giriş cümlesi farklı olsun. Aynı kalıbı tekrar kullanmaktan kaçın.
+8. ${explanationLength[difficulty]}
 `;
 
   const extremeMandate = (difficulty === 'extreme')
     ? `\n[!!! UZMAN SEVİYE ÖZEL TALİMATI - ACIMASIZ VE AKADEMİK !!!]:
 Bu test UZMAN / AKADEMİK seviyededir. 
-1. Genelgeçer saray görevlisi isimleri (Çeşnigir, İbrikdar, Bostancıbaşı gibi bilinen görevliler) veya herkesin ezbere bildiği temel kavramlar/vergiler (Öşür, Haraç, Cizye, İkta, Tımar) yerine; dokümanda geçen en kıyıda köşede kalmış, dipnotlarda veya tabloların içinde yer alan, en az bilinen en uç detay bilgileri (örn: vergi alt türleri, nadir divan defterleri, özel eyalet yönetim detayları, az bilinen kurumlar ve onların mikro görevleri, özel vakıf şartları) bul ve sor.
+1. Genelgeçer veya herkesin ezbere bildiği temel kavramlar, kurumlar veya ünvanlar yerine; dokümanda geçen en kıyıda köşede kalmış, dipnotlarda veya tabloların içinde yer alan, en az bilinen en uç detay bilgileri bul ve sor.
 2. Çeldiricileri (şıklar) birbirine aşırı benzer, kavramsal olarak çok yakın ve kafa karıştırıcı yap. Yanlış şıklar da uydurma değil, dokümanın başka yerlerinde geçen gerçek terimler olsun ki çeldirme gücü maksimuma ulaşsın.
-3. Soruyu okuyan kişi konuyu bilse dahi, en ince detayı hatırlamakta zorlanacak derecede seçici bir dil ve akademik ciddiyet kullan.\n`
+3. Soruyu okuyan kişi konuyu bilse dahi, en ince detayı hatırlamakta zorlanacak derecede seçici bir dil ve akademik ciddiyet kullan.
+4. DERİN BİLGİ MADENCİLİĞİ: Her soruyu üretmeden önce, atanmış sayfadaki/bölümdeki metni satır satır tarayarak diğer soruların kullanmadığı, gözden kaçabilecek en küçük detayı (bir tablodaki tek bir hücre, bir parantez içi bilgi, bir isim, bir tarih, bir ayırt edici özellik) bul ve soruyu bu detay üzerine kur. Soruyu bu detay üzerine kurarak en az bilinen ve en seçici bilgiyi hedefle.\n`
     : '';
 
   const pageRangeInstruction = (pdfPageRange && pdfPageRange.trim().length > 0)
     ? `\nKRİTİK SAYFA ARALIĞI SINIRLANDIRMASI (HAYATİ ÖNEMDE):
 - PDF belgesinin tamamından değil, YALNIZCA [${pdfPageRange}] sayfaları arasını oku ve analiz et.
-- Diğer sayfalara kesinlikle göz atma, soru üretme ve şıklar için buraları tarama. Sadece ve sadece bu sayfalar arasındaki bilgilerden soru yaz.\n`
+- Diğer sayfalara göz atmaktan kaçınarak, sadece ve sadece bu sayfalar arasındaki bilgilerden soru yaz.\n`
     : '';
 
   const geographyMapInstruction = `
-[!!! COĞRAFYA HARİTALI SORU TALİMATI - SON DERECE KRİTİK VE MUTLAK ZORUNLU !!!]:
-Eğer Coğrafya konuları hakkında soru üretiyorsan, ürettiğin toplam soruların en az %30'unu (örn: 10 soruluk bir testte en az 3 soruyu) **Türkiye Haritalı Soru** olarak tasarla.
-1. Haritalı sorularda, haritada vurgulanmasını ve işaretlenmesini istediğin illerin plaka kodlarını (1-81 arası tamsayılar, örn: Rize için [53]) "highlighted_province_ids" alanına SADECE INTEGER (Tamsayı) dizisi olarak ekle. KESİNLİKLE STRING ("53", "07") KULLANMA! (Haritasız normal sorularda bu alanı [] bırak).
-2. KRİTİK UI KISITLAMASI (DİKKAT!): Uygulamadaki harita motoru, "highlighted_province_ids" içine yazdığın illeri sadece KIRMIZIYA BOYAR. İllerin üzerine KESİNLİKLE numara (I, II, III vb.) veya harf YAZAMAZ.
-3. BU YÜZDEN ŞU SORU TİPİ KESİNLİKLE YASAKTIR: "Haritada numaralandırılmış alanların hangisinde..." deyip şıklara "A) I, B) II, C) III" koymak YASAKTIR. Şıklara il plakası "A) 34, B) 06" koymak YASAKTIR. Bu tür sorular uygulamada çözülemez ve testin kalitesini bozar.
+[!!! COĞRAFYA HARİTALI SORU TALİMATI - SON DERECE KRİTİK HARİTA GÖRSEL UYUMU !!!]:
+Eğer Coğrafya konuları hakkında soru üretiyorsan, veya PDF adı coğrafya ile ilgili ise, ürettiğin toplam soruların en az %30'unu **Türkiye Haritalı Soru** olarak tasarla.
+1. Haritalı sorularda, haritada vurgulanmasını ve işaretlenmesini istediğin illerin plaka kodlarını (1-81 arası tamsayılar) "highlighted_province_ids" alanına SADECE INTEGER (Tamsayı) dizisi olarak ekle. KESİNLİKLE STRING KULLANMA! (Haritasız normal sorularda bu alanı [] bırak veya ekleme).
+2. KRİTİK UI KISITLAMASI (DİKKAT!): Uygulamadaki harita motoru, "highlighted_province_ids" içine yazdığın illeri sadece KIRMIZIYA BOYAR. İllerin üzerine numara veya harf yazamaz.
+3. BU YÜZDEN ŞU SORU TİPİNDEN KAÇINILMALIDIR: Haritada numaralandırılmış alanları işaret edip şıklara bu numaraları koymak veya şıklara doğrudan plaka sayıları yazmak yerine; soruları doğrudan coğrafi veya fiziki özellikler üzerinden kurgula.
 4. DOĞRU HARİTALI SORU TİPLERİ ŞUNLARDIR:
-   - TİP 1 (Tek İl İşaretli): Sadece 1 ilin plakasını "highlighted_province_ids" içine ekle. Soru: "Yukarıdaki haritada kırmızı renk ile gösterilen yörede aşağıdaki tarım ürünlerinden hangisi yetişmez?". Şıklar: "A) Pamuk, B) Fındık, C) Çay...".
-   - TİP 2 (Çoklu İl İşaretli): Birden fazla ilin plakasını ekle (örn: [53, 61, 08]). Soru: "Türkiye haritasında koyu renkle işaretlenen illerin ortak coğrafi özelliği aşağıdakilerden hangisidir?". Şıklar: "A) Dağların kıyıya dik uzanması, B) Yaz kuraklığının belirgin olması...".
-   - Harita kullanmadan "I ve II" öncüllü soru sormak serbesttir, ancak bu öncüller soru metni (question_text) içinde metin olarak yazılmalıdır.
-5. "highlighted_province_ids" içine yazdığın iller ile soru kökünde/çözümde kastedilen iller %100 uyuşmalıdır. (Örn: Soru Erzurum-Kars ise plakalar kesinlikle [25, 36] olmalıdır).
-6. Soru veya seçenek metnine KESİNLİKLE "[6]", "[34]" gibi plaka sayıları yazma, sadece doğal ifadeler kullan.
+   - TİP 1 (Tek İl İşaretli): Sadece 1 ilin plakasını "highlighted_province_ids" içine ekle. Soru kökünde haritada kırmızı ile gösterilen yörenin coğrafi özelliklerini sor, seçenekleri de buna uygun kurgula.
+   - TİP 2 (Çoklu İl İşaretli): Birden fazla ilin plakasını ekle. Soru kökünde işaretlenen tüm illerin ortak coğrafi özelliğini sor, seçenekleri de buna uygun kurgula.
+   - Harita kullanmadan öncüllü soru sormak serbesttir, ancak bu öncüller soru metni (question_text) içinde metin olarak yazılmalıdır.
+5. "highlighted_province_ids" içine yazdığın iller ile soru kökünde/çözümde kastedilen coğrafi konumlar %100 uyuşmalıdır.
+6. Soru veya seçenek metnine plaka sayılarını doğrudan yazmak yerine, sadece doğal il/yöre isimleri kullan.
 `;
 
-  const hasGeography = topics.some((t) => t.toLowerCase().includes('cog') || t.toLowerCase().includes('coğrafya') || t.toLowerCase().includes('cografya') || t.toLowerCase().includes('harita')) ||
-    (pdfName && (pdfName.toLowerCase().includes('cografya') || pdfName.toLowerCase().includes('coğrafya') || pdfName.toLowerCase().includes('harita')));
-  const mapInstructionToUse = hasGeography ? geographyMapInstruction : '';
+  const vatandaslikInstruction = `
+[!!! VATANDAŞLIK SORUSU TALİMATI - SON DERECE KRİTİK VE SEÇİCİ !!!]:
+Eğer Vatandaşlık konusu hakkında soru üretiyorsan, veya PDF adı vatandaşlık ile ilgili ise:
+1. Soruları anayasa maddelerine, kanunlara ve güncel hukuki terimlere tam olarak sadık kalarak kurgula.
+2. ÖSYM tarzı seçici çeldiriciler kullan: Seçeneklerde birbirine kavramsal olarak çok benzeyen hukuk kurallarını, yaptırım türlerini veya yasama/yürütme organlarının yetkilerini çeldirici olarak kurgula.
+3. Sorularda doğrudan kuru bilgi ölçmek yerine, olay örgüsü (vaka) kurgula veya farklı organlar arasındaki denge ve seçim süreçlerini sorarak bilginin analiz edilmesini iste.
+4. Öncüllü sorularda hukuk kurallarını ya da devlet organlarının görevlerini listeleyip bunların ait olduğu kurumları veya yetki sahiplerini ayırt ettiren seçici kurgular hazırla.
+`;
+
+  const guncelInstruction = `
+[!!! GÜNCEL BİLGİLER VE KÜLTÜR SORUSU TALİMATI - SON DERECE ÖNEMLİ !!!]:
+Eğer Güncel Bilgiler konusu hakkında soru üretiyorsan, veya PDF adı güncel bilgiler ile ilgili ise:
+1. Soruları tamamen güncel verilere (2025/2026 yılları), Türkiye ve dünya gündemine, önemli uluslararası ödüllere, uluslararası kuruluşların güncel yapılarına, Türkiye'nin savunma sanayii ve teknoloji başarılarına odaklayarak hazırla.
+2. Tarihi ilkler ve kültürel miras da güncel bilgiler kapsamında sorulabilir.
+3. Çeldiricileri çok güçlü tut: Seçeneklere ve çeldiricilere, sorunun konusuyla ilgili olan ancak tarihleri, isimleri, yerleri veya alanları farklı kurgulanmış yanıltıcı ve yakın kavramları ekleyerek çeldirme gücünü artır.
+4. Doküman doğruluğu: Sadece dokümanda veya doğrulanmış KPSS müfredatında geçen kesin, net ve doğrulanabilir güncel gerçekleri soruya dönüştür.
+5. Konu Çeşitliliği: Her yeni testte farklı ve çeşitli konuları seçmeye özen göster. Ülkelerin dönem başkanlıkları, uluslararası zirveler, ödüller, spor başarıları, ilkler ve farklı coğrafi değerler arasından dengeli bir dağılım yap.
+`;
+
+  const premiumNotesInstruction = `
+[!!! PREMİUM NOT ÖZELLİKLERİ VE TUZAKLAR - SON DERECE KRİTİK !!!]:
+Eğer sana verilen PDF/Markdown dokümanı bir "Premium" ders notu ise (başlığında veya içeriğinde "Premium", "ÖSYM TUZAĞI / UYARI:" gibi ifadeler barındırıyorsa):
+1. Dokümanda geçen 'ÖSYM TUZAĞI / UYARI:' veya 'Tuzak / Uyarı' bölümlerinde yer alan kritik bilgileri inceleyerek, çeldiricileri bu uyarılarda belirtilen şaşırtmacalara ve tuzaklara göre kurgula.
+2. Bu uyarılarda belirtilen kafa karıştırıcı ve adayların en sık hata yaptığı püf noktalarını doğrudan soru ve çeldirici konusu yap.
+`;
+
+  const selectedTopicObjects = topics.map(tName => topicsDb.find(td => td.name === tName)).filter((t): t is Topic => !!t);
+
+  const hasGeography = selectedTopicObjects.some(t => t.category === 'cografya') ||
+    (pdfName && (pdfName.toLowerCase().includes('cografya') || pdfName.toLowerCase().includes('coğrafya') || pdfName.toLowerCase().includes('harita') || pdfName.toLowerCase().includes('cog_')));
+  
+  const hasVatandaslik = selectedTopicObjects.some(t => t.category === 'vatandaslik') ||
+    (pdfName && (pdfName.toLowerCase().includes('vatandaslik') || pdfName.toLowerCase().includes('vatandaşlık') || pdfName.toLowerCase().includes('calisma-yapraklari')));
+    
+  const hasGuncel = selectedTopicObjects.some(t => t.category === 'guncel') ||
+    (pdfName && (pdfName.toLowerCase().includes('guncel') || pdfName.toLowerCase().includes('güncel') || pdfName.toLowerCase().includes('guncelbilgiler') || pdfName.toLowerCase().includes('guncel-bilgiler')));
+
+  const subjectBoundaryInstruction = `
+[!!! 🔴 KONU VE DERS SINIRI KILAVUZU !!!]:
+- Bu testin tüm sorularını YALNIZCA seçilen şu konular [${topicsString}] kapsamından üret.
+- Sorularının doğrudan seçilen ünitenin temel kazanımını, konusunu veya terimlerini ölçtüğünden emin ol.
+- Seçtiğin konunun dışındaki diğer derslerin veya aynı dersin diğer ünitelerinin alanına giren bağımsız sorular yerine, tamamen seçilen konunun kendi müfredatına ve kavramlarına odaklanarak konu bütünlüğünü koru. Soru hazırladığın ünitenin sınırlarına ve dönemine tam olarak sadık kal.
+`;
+
+  let subjectInstructions = '';
+  subjectInstructions += subjectBoundaryInstruction;
+  if (hasGeography) subjectInstructions += geographyMapInstruction;
+  if (hasVatandaslik) subjectInstructions += vatandaslikInstruction;
+  if (hasGuncel) subjectInstructions += guncelInstruction;
+  if (isPdfMode) subjectInstructions += premiumNotesInstruction;
+
+  const mapInstructionToUse = subjectInstructions;
+
+  const difficultyHeader = (difficulty === 'hard' || difficulty === 'extreme')
+    ? `[!!! 🚨 DİKKAT: BU TESTİN ZORLUK DERECESİ: ${difficulty.toUpperCase()} 🚨 !!!]
+- Bu testin temel amacı, en seçici adayları bile zorlayacak ve konunun en ince ayrıntılarına hakimiyeti ölçecek düzeyde sorular üretmektir.
+- Genel geçer, popüler veya yüzeysel başlıklar yerine; dokümanın veya müfredatın en detaylı satırlarını, dipnotlarını, tablolarını, küçük kanun/yönetmelik maddelerini ve sebep-sonuç ilişkilerini soru konusu yap.
+- Seçenekler ve çeldiriciler birbirine son derece yakın, kavramsal veya kronolojik olarak karıştırılmaya müsait gerçek terimlerden oluşmalıdır.
+
+`
+    : '';
 
   const systemPrompt = (pdfBase64 || geminiFileUri)
-    ? `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${pdfVarietyAndCoverageMandate}
+    ? `${difficultyHeader}Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${pdfVarietyAndCoverageMandate}
 Sana verilen PDF dokümanını TEK VE MUTLAK KAYNAK olarak kullan. ${pageRangeInstruction}
 
-Lütfen çıktıyı SADECE geçerli bir JSON formatında ver. JSON objelerinin sonuna ASLA trailing comma (sondaki virgül) KOYMA.
+Lütfen çıktıyı SADECE geçerli bir JSON formatında ver. JSON objelerinin sonuna trailing comma (sondaki virgül) koymaktan kaçın.
 
-KRİTİK DOKÜMANA SADAKAT KURALI (MÜFREDAT VE DIŞ BİLGİ YASAĞI):
-1. Kendi eğitim verilerindeki veya dış dünyadaki genel KPSS müfredatı bilgilerini KESİNLİKLE KULLANMA!
+KRİTİK DOKÜMANA SADAKAT KURALI (MÜFREDAT VE DIŞ BİLGİ SINIRI):
+1. Kendi eğitim verilerindeki veya dış dünyadaki genel KPSS bilgilerini geri planda tutarak, tamamen sana verilen PDF dokümanına bağlı kal.
 2. Soracağın her bir sorunun cevabı, şıkları ve tüm detayları BİREBİR ve YALNIZCA sana iletilen PDF dokümanının içinde yazıyor olmalıdır.
-3. PDF dokümanında geçmeyen hiçbir tarihi olayı, coğrafi detayı, kanunu veya bilgiyi (müfredatta yer alsa dahi) kesinlikle soruya dönüştürme.
+3. Yalnızca PDF dokümanında açıkça yazan bilgileri, olayları, coğrafi ayrıntıları veya kanuni maddeleri soruya dönüştür.
 
 ${topics.length > 0
       ? `KRİTİK KONU SINIRLANDIRMA KURALI:
 - Yalnızca şu seçilen konular hakkında soru üret: [${topicsString}].
-- PDF dokümanı içinde geçiyor veya diğer sayfalarda yer alıyor olsa dahi, bu listede yer almayan diğer hiçbir konudan/üniteden (örneğin Osmanlı Devleti, İnkılap Tarihi vb. seçilmeyen diğer ünitelerden) KESİNLİKLE soru üretme! Sadece bu konularla doğrudan ilgili olan kısımları tarayıp soru yaz.`
+- PDF dokümanı içinde geçiyor veya diğer sayfalarda yer alıyor olsa dahi, bu listede yer almayan diğer konuları/üniteleri kapsam dışı bırak ve sadece bu seçilen konularla doğrudan ilgili olan kısımları tarayıp soru yaz.`
       : `KONU SINIRLANDIRMA KURALI:
 - Herhangi bir konu kısıtlaması yoktur. PDF dokümanının tamamını tarayarak soruları dengeli bir şekilde üret.`
     }
@@ -680,17 +766,17 @@ ${extremeMandate}${mapInstructionToUse}
 ${distributionPlan}
 
 [BENZERSİZLİK ANAHTARI (SEHPA HAFİZASI): ${Date.now()}_${Math.floor(Math.random() * 1000)}]`
-    : `Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${varietyAndCoverageMandate}
-Lütfen çıktıyı SADECE geçerli bir JSON formatında ver. JSON objelerinin sonuna ASLA trailing comma (sondaki virgül) KOYMA.
+    : `${difficultyHeader}Sen profesyonel bir ÖSYM / KPSS soru yazarı uzmanısın. ${difficultyInstruction}${speedConstraints}${varietyAndCoverageMandate}
+Lütfen çıktıyı SADECE geçerli bir JSON formatında ver. JSON objelerinin sonuna trailing comma (sondaki virgül) koymaktan kaçın.
 
 MÜFREDAT BİLGİSİ:
-Aşağıdaki KPSS müfredatı detaylarını referans al ve YALNIZCA seçilen şu konular [${topicsString}] hakkında soru sor. Diğer konulara kesinlikle girme:
+Aşağıdaki KPSS müfredatı detaylarını referans al ve YALNIZCA seçilen şu konular [${topicsString}] hakkında soru sor:
 ${syllabusContext}
 
 [!!! KRİTİK KONU VE DÖNEM SINIRLANDIRMA UYARISI !!!]:
 - Soracağın tüm soruları SADECE yukarıdaki "MÜFREDAT BİLGİSİ" alanında listelenmiş ve sana detayları verilen [${topicsString}] konusu/konuları ile sınırla.
-- Bu konunun/konuların dışındaki diğer hiçbir KPSS tarih konusuna (örneğin Osmanlı Devleti, İlk Türk İslam Devletleri, Selçuklular, II. Mahmut, İnkılap Tarihi, Çağdaş Tarih vb.) KESİNLİKLE DOKUNMA, TEK BİR SORU DAHİ SORMA!
-- Tüm sorular (örneğin 20 sorunun tamamı) sadece seçilen bu konulardan gelmek zorundadır. Farklı dönemlerin veya konuların sorularını araya kesinlikle karıştırma.
+- Sadece yukarıda sana sınırları çizilen üniteler hakkında sorular yaz; müfredattaki diğer dönemleri veya üniteleri tamamen kapsam dışı bırak.
+- Tüm soruların tamamı sadece seçilen bu konulardan gelmek zorundadır. Farklı dönemlerin veya konuların sorularını araya karıştırmadan konu bütünlüğünü sağla.
 
 ${extremeMandate}${mapInstructionToUse}
 
@@ -768,7 +854,7 @@ ${excludeQuestionsInstruction}`;
       },
     ],
     generationConfig: {
-      temperature: isPdfMode ? 0.75 : 0.80, // Raised to allow diversity; distribution plan enforces structure instead of temperature
+      temperature: temperature,
       topP: 0.95,
       topK: 40,
       maxOutputTokens: 8192,
@@ -787,7 +873,7 @@ ${excludeQuestionsInstruction}`;
                 question_text: { type: 'STRING' },
                 subtopic: {
                   type: 'STRING',
-                  description: 'Sorunun ölçtüğü çok spesifik, mikro konu başlığı veya kavram (örn: "Uygurlar Maniheizm Etkisi", "Heyelan Set Gölleri", "Kut\'ül Amare", "Sened-i İttifak"). Asla genel/büyük konu adları veya "Tarih", "Coğrafya" gibi genel kategoriler yazma!'
+                  description: 'Sorunun ölçtüğü çok spesifik, mikro konu başlığı veya kavram. Genel kategori veya büyük konu adları yazmak yerine, doğrudan mikro kavramı belirt.'
                 },
                 options: {
                   type: 'OBJECT',
@@ -1138,8 +1224,7 @@ Soru, KPSS standartlarında, zor ve seçici olmalıdır. 5 şıklı olmalıdır 
 Cevap seçenekleri ve detaylı çözüm analizi (rational_explanation) mutlaka olmalıdır.
 
 ÇOK KRİTİK GEREKLİLİK (HARİTALI SORULARDA COĞRAFİ UYUMLULUK VE KURAL):
-Eğer haritalı soru üretiyorsan, "highlighted_province_ids" dizisine eklediğin plaka kodları (1-81 arası) ile soru kökündeki ve çözümdeki iller coğrafi olarak %100 BİREBİR AYNI olmalıdır!
-Asla plaka kodları başka bir il (örn: 6-Ankara, 34-İstanbul) iken, soruda ve çözümde başka illeri (örn: Erzurum, Ardahan) kastedip saçma sapan "haritada aslında bu kastedilmiştir" gibi açıklamalar yazma. Plaka kodları ile sorulan iller birebir uyuşmalıdır.`;
+Eğer haritalı soru üretiyorsan, "highlighted_province_ids" dizisine eklediğin plaka kodları (1-81 arası) ile soru kökündeki ve çözümdeki illeri coğrafi olarak uyumlu yap. Plaka kodları ile sorulan illerin birbiriyle uyumlu olmasını sağla.`;
 
   const userPrompt = `Aşağıdaki temel soruyla AYNI alt konuyu/kavramı ölçen benzer bir soru hazırla:
 Alt Başlık: ${baseQuestion.subtopic || 'KPSS Kavramı'}
@@ -1242,12 +1327,12 @@ export async function generateSmartIndexSummary(
 Görevin, sana verilen kavramla ilgili, KPSS sınavında %100 karşılarına çıkabilecek en kritik, en kıyıda köşede kalmış akademik ve ÖSYM tarzı detayları içeren, son derece pratik ve akılda kalıcı bir çalışma özeti (Cheat Sheet / Ders Notu) hazırlamaktır.
 Markdown formatını çok şık ve temiz bir şekilde kullan. Önemli yerleri kalın yaz, tablolar ve maddeler kullanarak görsel ezberi kolaylaştır.
 
-KRİTİK TALİMAT: KESİNLİKLE "Merhaba şampiyon", "Hoş geldin", "Kemerleri bağla", "Başarılar dilerim" gibi selamlama, giriş, sohbet veya kapanış cümleleri yazma! Token israfı ve gereksiz laf kalabalığı KESİNLİKLE YASAKTIR. Doğrudan ve sadece şablonun ilk başlığı (# 👑 ...) ile başlayıp içeriği üret ve son madde bittiğinde çıktıyı bitir.`;
+REHBER: Selamlama, giriş, sohbet veya kapanış cümlelerini yazmak yerine doğrudan ve sadece şablonun ilk başlığı (# 👑 ...) ile başlayıp içeriği üret ve son madde bittiğinde çıktıyı sonlandır.`;
 
   const userPrompt = `Lütfen "${concept}" kavramı ile ilgili, KPSS sınav müfredatına tam uyumlu efsanevi bir hızlı tekrar notu oluştur.
-Kategori: ${category === 'tarih' ? 'KPSS Tarih (Islahatlar, Savaşlar, Teşkilat, Padişah Dönemi vb.)' : 'KPSS Coğrafya (Maden Yatakları, Sanayi Tesisleri, Ulaşım vb.)'}
+Kategori: ${category === 'tarih' ? 'KPSS Tarih' : 'KPSS Coğrafya'}
 
-Eğer sana yüklediğim PDF notları varsa, öncelikle o PDF'teki bilgileri tara ve süzgeçten geçir. PDF'te bu kavramla ilgili yer alan detayları asla atlama.
+Eğer sana yüklediğim PDF notları varsa, öncelikle o PDF'teki bilgileri tara ve süzgeçten geçirerek tüm detayları eksiksiz bir şekilde rapora dahil et.
 
 Markdown başlık yapısı şöyle olsun (Giriş yapmadan direkt bu başlıkla başla):
 # 👑 ${concept} - KPSS Akıllı Tekrar Notu
@@ -1320,7 +1405,7 @@ export async function generateTimelineEventDetail(
   const systemPrompt = `Sen son derece deneyimli, Türkiye'nin en iyi KPSS Tarih öğretmenisin.
 Görevin, kullanıcının seçtiği tarihi olay hakkında harikulade, nokta atışı ve ÖSYM tarzı zengin bir ders notu/bilgi kartı hazırlamaktır.
 
-KRİTİK TALİMAT: KESİNLİKLE "Merhaba değerli meslektaş adayı", "KPSS yolculuğunda başarılar", "Hadi başlayalım" gibi selamlama, giriş, sohbet veya kapanış cümleleri yazma! Token israfı ve gereksiz laf kalabalığı KESİNLİKLE YASAKTIR. Doğrudan ve sadece aşağıdaki şablonun ilk başlığı (## 📌 ...) ile başlayıp içeriği üret.
+REHBER: Selamlama, giriş, sohbet veya kapanış cümlelerini yazmak yerine doğrudan ve sadece aşağıdaki şablonun ilk başlığı (## 📌 ...) ile başlayıp içeriği üret.
 
 Notu hazırlarken şu şablona sadık kal (Markdown formatında, ancak ham *, # gibi işaretleri temiz ve okunaklı paragraflar halinde sunmaya uygun biçimde, göz yormayacak bir düzende yaz):
 
@@ -1331,7 +1416,7 @@ Notu hazırlarken şu şablona sadık kal (Markdown formatında, ancak ham *, # 
 ... (Olayın en önemli siyasi, askeri veya sosyal sonuçları. KPSS'de gelebilecek maddeler)
 
 ## 💡 ÖSYM'nin En Sevdiği KPSS Tuzakları & Tüyolar (Hocanın Notu)
-... (Sınavda adayları düşürmek için hazırlanan çeldiriciler, kavram karmaşaları, kronolojik önemli detaylar - örneğin I. Kosova'da I. Murat'ın şehit edilmesi gibi kritik KPSS tüyoları)
+... (Sınavda adayları düşürmek için hazırlanan çeldiriciler, kavram karmaşaları, kronolojik önemli detaylar ve kritik KPSS tüyoları)
 
 Notun tamamı Türkçe, son derece akıcı, net, nokta atışı bilgi odaklı ve akademik olarak %100 hatasız olmalıdır.`;
 
@@ -1387,10 +1472,24 @@ export function cleanPlakaFromText(text: string): string {
   return cleaned;
 }
 
+export function cleanReferencingPhrases(text: string): string {
+  if (!text) return '';
+  let cleaned = text.trim();
+  if (cleaned.length < 130 && !cleaned.includes('\n')) {
+    cleaned = cleaned.replace(/^(?:Yukarıdaki bilgilere göre|Yukarıdaki verilere göre|Yukarıda verilen bilgilere göre|Verilen bilgilere göre|Bu bilgilere göre|Buna göre|Bu gelişmelerin sonucunda|Bu bilgilere dayanarak|Verilen metne göre)\s*,\s*/i, '');
+    if (cleaned.length > 0) {
+      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+  }
+  return cleaned;
+}
+
 export function cleanQuestionPlakas(q: QuizQuestion): QuizQuestion {
+  let qText = cleanPlakaFromText(q.question_text);
+  qText = cleanReferencingPhrases(qText);
   return {
     ...q,
-    question_text: cleanPlakaFromText(q.question_text),
+    question_text: qText,
     options: {
       A: cleanPlakaFromText(q.options.A),
       B: cleanPlakaFromText(q.options.B),
@@ -1400,4 +1499,86 @@ export function cleanQuestionPlakas(q: QuizQuestion): QuizQuestion {
     },
     rational_explanation: cleanPlakaFromText(q.rational_explanation),
   };
+}
+
+/**
+ * RAG-like search on the study PDF or syllabus using Gemini.
+ * Explains any term or answers any question about the notes or KPSS curriculum.
+ */
+export async function generateSmartIndexSearch(
+  query: string,
+  apiKey: string,
+  pdfBase64?: string | null,
+  geminiFileUri?: string | null
+): Promise<string> {
+  if (!apiKey) {
+    throw new Error('API anahtarı bulunamadı.');
+  }
+
+  const modelName = useSettingsStore.getState().geminiModel || 'gemini-3.1-flash-lite';
+
+  const systemPrompt = `Sen KPSS hazırlık alanında efsaneleşmiş, milyonlarca öğrenciye Türkiye derecesi yaptırmış uzman bir KPSS arama motoru ve çalışma koçusun.
+Görevin, kullanıcının sorduğu soruya veya aradığı kavrama, öncelikle sana yüklenen PDF ders notlarını tarayarak, ardından akademik ve ÖSYM standartlarındaki bilgilerinle KPSS odaklı mükemmel bir açıklama hazırlamaktır.
+Görevi yerine getirirken, bilgiyi doğrudan, gereksiz laf kalabalığı yapmadan yanıtla.
+Eğer yanıt yüklenen PDF ders notlarında geçiyorsa, nottaki detayları belirt ve hangi bağlamda/sayfalarda geçtiğini açıkla (örn: "Yüklenen PDF notlarında Sayfa X'te belirtildiği üzere...").
+Bilgiyi maddeler halinde, şık bir markdown tasarımıyla sun. Kalın yazım kurallarını (bold) etkin kullan.
+"Giriş/Selamlama" ve "Kapanış/Sohbet" cümleleri yazmak yerine doğrudan konu başlığı (# 🔍 ...) ile başla ve son madde bittiğinde çıktıyı sonlandır.`;
+
+  const userPrompt = `Arama Sorgusu / Soru: "${query}"
+
+Lütfen bu sorguyu KPSS müfredatına ve yüklenen PDF notlarına sadık kalarak, aşağıdaki başlık şablonuyla açıkla:
+
+# 🔍 "${query}" - KPSS Arama Sonucu
+## 📌 Kavramsal Açıklama & PDF Bağlamı
+... (Buraya doğrudan, maddeli ve varsa PDF sayfa referanslı açıklama gelecek)
+## 💡 Sınavda Nasıl Sorulur? (ÖSYM Tarzı Çıkabilecek Soru Kalıpları)
+... (Buraya bu kavramın KPSS'de ne şekilde sorulabileceğini, muhtemel çeldiricileri ve tuzakları yaz)`;
+
+  const parts: any[] = [];
+  if (geminiFileUri) {
+    parts.push({
+      fileData: {
+        fileUri: geminiFileUri,
+        mimeType: 'application/pdf',
+      },
+    });
+  } else if (pdfBase64) {
+    parts.push({
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: pdfBase64,
+      },
+    });
+  }
+
+  parts.push({ text: userPrompt });
+
+  const requestBody = {
+    systemInstruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts: parts,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 4096,
+    },
+  };
+
+  const resultData = await fetchGeminiWithFallback(
+    modelName,
+    requestBody,
+    apiKey
+  );
+
+  const textResponse = resultData?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!textResponse) {
+    throw new Error('Yapay zeka arama sorgusunu cevaplayamadı.');
+  }
+
+  return textResponse;
 }

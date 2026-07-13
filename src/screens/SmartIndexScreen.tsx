@@ -6,14 +6,14 @@
 
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useQuizStore } from '../store/useQuizStore';
-import { generateSmartIndexSummary } from '../services/geminiService';
+import { generateSmartIndexSummary, generateSmartIndexSearch } from '../services/geminiService';
 
 interface IndexItem {
   id: string;
@@ -69,6 +69,53 @@ export const SmartIndexScreen: React.FC = () => {
   const [selectedConcept, setSelectedConcept] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    if (!apiKey) {
+      const msg = 'Yapay zeka araması yapmak için önce Ayarlar ekranından API anahtarınızı girin.';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('API Anahtarı Gerekli', msg);
+      }
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setSelectedConcept(`Arama: "${searchQuery}"`);
+      setSummary(null);
+
+      const res = await generateSmartIndexSearch(
+        searchQuery,
+        apiKey,
+        geminiFileUri ? null : pdfBase64,
+        geminiFileUri
+      );
+      setSummary(res);
+      setSearchQuery(''); // Clear search box
+    } catch (err: any) {
+      console.error(err);
+      const isExpired = err.message?.includes('PDF_EXPIRED') || err.message?.includes('not found') || err.message?.includes('files/');
+      
+      const title = isExpired ? 'PDF Süresi Dolmuş' : 'Hata';
+      const msg = isExpired 
+        ? 'Seçili PDF dosyasının sunucudaki süresi dolmuş. Lütfen Konu Seçimi ekranına giderek PDF dosyasını yeniden seçin/yükleyin.'
+        : 'Arama yapılırken bir yapay zeka hatası oluştu. Lütfen tekrar deneyin.';
+
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert(title, msg);
+      }
+      setSelectedConcept(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const items = activeTab === 'tarih' ? HISTORICAL_FIGURES : GEOGRAPHICAL_RESOURCES;
 
@@ -157,6 +204,26 @@ export const SmartIndexScreen: React.FC = () => {
       </View>
 
       <ScrollView style={s.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={s.listContent}>
+        {/* Search Bar / AI Copilot */}
+        <View style={s.searchContainer}>
+          <TextInput
+            style={s.searchInput}
+            placeholder="PDF notlarında ara veya soru sor..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          <TouchableOpacity 
+            style={s.searchBtn} 
+            onPress={handleSearch}
+            activeOpacity={0.8}
+          >
+            <Text style={s.searchBtnText}>Sor ⚡</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={s.title}>
           {activeTab === 'tarih' ? '👑 KPSS Akıllı Padişah & Sadrazam İndeksi' : '🌍 KPSS Akıllı Coğrafya Konu İndeksi'}
         </Text>
@@ -357,5 +424,37 @@ const getStyles = (colors: any) => StyleSheet.create({
   mdPara: { color: colors.textSecondary, fontSize: fontSize.md, lineHeight: 26, marginVertical: 6 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 6 },
   bulletDot: { fontSize: 18, color: colors.primary, marginRight: 8 },
-  bulletText: { flex: 1, color: colors.textSecondary, fontSize: fontSize.md, lineHeight: 26 }
+  bulletText: { flex: 1, color: colors.textSecondary, fontSize: fontSize.md, lineHeight: 26 },
+  searchContainer: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.xxl,
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
+    backgroundColor: colors.surfaceHighlight || colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    height: 52,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    height: '100%',
+    paddingRight: spacing.md,
+    fontWeight: '600',
+  },
+  searchBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md - 2,
+  },
+  searchBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+  },
 });

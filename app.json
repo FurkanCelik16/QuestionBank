@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Deneme",
+    "name": "KPSS YZ Premium",
     "slug": "Deneme",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.bsfurkan1667.Deneme"
+      "package": "com.bsfurkan1667.DenemePremium"
     },
     "web": {
       "favicon": "./assets/favicon.png"

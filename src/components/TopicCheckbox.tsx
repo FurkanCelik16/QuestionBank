@@ -12,7 +12,7 @@ interface TopicCheckboxProps {
   label: string;
   isSelected: boolean;
   onToggle: () => void;
-  category: 'tarih' | 'cografya';
+  category: 'tarih' | 'cografya' | 'vatandaslik' | 'guncel';
 }
 
 export const TopicCheckbox: React.FC<TopicCheckboxProps> = ({

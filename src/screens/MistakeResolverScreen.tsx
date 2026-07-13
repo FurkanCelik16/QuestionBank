@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, borderRadius, spacing, fontSize } from '../theme/colors';
+import { SvgXml } from 'react-native-svg';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { QuizQuestion } from '../types';
@@ -302,6 +303,16 @@ export const MistakeResolverScreen: React.FC<Props> = ({ navigation }) => {
                   <View style={s.divider} />
                   <Text style={s.explanationLabel}>Soru Çözüm Analizi:</Text>
                   <Text style={s.explanationText}>{activeQuestion.rational_explanation}</Text>
+
+                  {/* Mind Map Section */}
+                  {activeQuestion.mind_map_svg && activeQuestion.mind_map_svg.trim().length > 0 && (
+                    <View style={s.mindMapContainer}>
+                      <Text style={s.mindMapTitle}>🧠 AI Kavramsal Akıl Haritası</Text>
+                      <View style={s.mindMapXmlWrapper}>
+                        <SvgXml xml={activeQuestion.mind_map_svg} width="100%" height={140} />
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
             </Animated.View>
@@ -439,5 +450,26 @@ const getStyles = (colors: any) => StyleSheet.create({
   emptyTitle: { color: colors.textPrimary, fontSize: fontSize.xxl, fontWeight: '800', marginBottom: spacing.md },
   emptyDesc: { color: colors.textSecondary, fontSize: fontSize.md, textAlign: 'center', lineHeight: 24, marginBottom: spacing.xxxl },
   backBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.xxl, paddingVertical: spacing.lg, borderRadius: borderRadius.lg },
-  backBtnText: { color: colors.textInverse, fontSize: fontSize.md, fontWeight: '700' }
+  backBtnText: { color: colors.textInverse, fontSize: fontSize.md, fontWeight: '700' },
+  mindMapContainer: {
+    marginTop: spacing.md,
+    backgroundColor: colors.background || '#0f172a',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  mindMapTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xxs + 1,
+    fontWeight: '800',
+    marginBottom: spacing.sm,
+    letterSpacing: -0.2,
+  },
+  mindMapXmlWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: borderRadius.sm,
+  },
 });

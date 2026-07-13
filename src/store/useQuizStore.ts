@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { QuizQuestion, QuizResult, DifficultyLevel } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 export interface PersistedPdf {
   uri: string;
@@ -59,6 +60,9 @@ interface QuizState {
   clearPdfSlot: (slotId: string) => Promise<void>;
   resetQuiz: () => void;
   resetQuizKeepTopics: () => void;
+  saveActiveSession: () => Promise<void>;
+  clearActiveSession: () => Promise<void>;
+  loadActiveSession: () => Promise<boolean>;
 
   // Computed
   getResults: () => QuizResult;
@@ -82,7 +86,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   pdfName: null,
   geminiFileUri: null,
   pdfPageRange: null,
-  pdfSlots: { slot_1: null, slot_2: null, slot_3: null },
+  pdfSlots: { slot_1: null, slot_2: null, slot_3: null, slot_4: null },
   selectedSlotId: null,
 
   setSelectedTopics: (topics) => set({ selectedTopics: topics }),
@@ -98,6 +102,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       userAnswers: {},
       error: null,
     });
+    get().saveActiveSession();
   },
 
   selectAnswer: (questionId, answer) => {
@@ -110,12 +115,14 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       }
       return { userAnswers: newAnswers };
     });
+    get().saveActiveSession();
   },
 
   nextQuestion: () => {
     const { currentIndex, questions } = get();
     if (currentIndex < questions.length - 1) {
       set({ currentIndex: currentIndex + 1 });
+      get().saveActiveSession();
     }
   },
 
@@ -123,6 +130,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     const { currentIndex } = get();
     if (currentIndex > 0) {
       set({ currentIndex: currentIndex - 1 });
+      get().saveActiveSession();
     }
   },
 
@@ -130,6 +138,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     const { questions } = get();
     if (index >= 0 && index < questions.length) {
       set({ currentIndex: index });
+      get().saveActiveSession();
     }
   },
 
@@ -192,9 +201,14 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         AsyncStorage.getItem('@kpss_pdf_page_range'),
       ]);
 
-      const pdfSlots = slotsJson 
-        ? JSON.parse(slotsJson) 
-        : { slot_1: null, slot_2: null, slot_3: null };
+      const parsedSlots = slotsJson ? JSON.parse(slotsJson) : {};
+      const pdfSlots = {
+        slot_1: null,
+        slot_2: null,
+        slot_3: null,
+        slot_4: null,
+        ...parsedSlots
+      };
       
       const selectedSlotId = selectedId || null;
       let activePdf: PersistedPdf | null = null;
@@ -275,9 +289,24 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   uploadToPdfSlot: async (slotId, uri, base64, name, geminiUri) => {
     const { pdfSlots, selectedSlotId } = get();
+
+    // Copy to permanent directory in React Native to avoid system cache cleanup
+    let finalUri = uri;
+    if (Platform.OS !== 'web') {
+      try {
+        const FileSystem = require('expo-file-system');
+        const permanentUri = FileSystem.documentDirectory + `slot_${slotId}_` + name.replace(/\s+/g, '_');
+        await FileSystem.copyAsync({ from: uri, to: permanentUri });
+        finalUri = permanentUri;
+        console.log('[Permanent Storage] Copied PDF successfully to:', permanentUri);
+      } catch (err) {
+        console.warn('[Permanent Storage] Failed to copy PDF:', err);
+      }
+    }
+
     const updatedSlots = {
       ...pdfSlots,
-      [slotId]: { uri, base64, name, geminiFileUri: geminiUri }
+      [slotId]: { uri: finalUri, base64, name, geminiFileUri: geminiUri }
     };
 
     const shouldSelect = !selectedSlotId;
@@ -290,7 +319,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
     if (shouldSelect) {
       set({
-        pdfUri: uri,
+        pdfUri: finalUri,
         pdfBase64: base64,
         pdfName: name,
         geminiFileUri: geminiUri,
@@ -317,6 +346,22 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   clearPdfSlot: async (slotId) => {
     const { pdfSlots, selectedSlotId } = get();
+    
+    // Delete permanent file from document directory in React Native
+    const activeSlot = pdfSlots[slotId];
+    if (activeSlot && activeSlot.uri && Platform.OS !== 'web') {
+      try {
+        const FileSystem = require('expo-file-system');
+        const fileInfo = await FileSystem.getInfoAsync(activeSlot.uri);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(activeSlot.uri, { idempotent: true });
+          console.log('[Permanent Storage] Deleted permanent PDF file successfully:', activeSlot.uri);
+        }
+      } catch (err) {
+        console.warn('[Permanent Storage] Failed to delete PDF file:', err);
+      }
+    }
+
     const updatedSlots = {
       ...pdfSlots,
       [slotId]: null
@@ -362,6 +407,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       difficulty: 'medium',
       pdfPageRange: null,
     });
+    get().clearActiveSession();
   },
 
   resetQuizKeepTopics: () => {
@@ -372,6 +418,74 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       isGenerating: false,
       error: null,
     });
+    get().clearActiveSession();
+  },
+
+  saveActiveSession: async () => {
+    const {
+      questions,
+      currentIndex,
+      userAnswers,
+      selectedTopics,
+      questionCount,
+      difficulty,
+      pdfUri,
+      pdfName,
+      pdfPageRange,
+    } = get();
+
+    if (questions.length === 0) return;
+
+    try {
+      const session = {
+        questions,
+        currentIndex,
+        userAnswers,
+        selectedTopics,
+        questionCount,
+        difficulty,
+        pdfUri,
+        pdfName,
+        pdfPageRange,
+      };
+      await AsyncStorage.setItem('@kpss_active_quiz_session', JSON.stringify(session));
+    } catch (e) {
+      console.warn('Failed to save active session:', e);
+    }
+  },
+
+  clearActiveSession: async () => {
+    try {
+      await AsyncStorage.removeItem('@kpss_active_quiz_session');
+    } catch (e) {
+      console.warn('Failed to clear active session:', e);
+    }
+  },
+
+  loadActiveSession: async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@kpss_active_quiz_session');
+      if (stored) {
+        const session = JSON.parse(stored);
+        if (session && session.questions && session.questions.length > 0) {
+          set({
+            questions: session.questions,
+            currentIndex: session.currentIndex,
+            userAnswers: session.userAnswers || {},
+            selectedTopics: session.selectedTopics || [],
+            questionCount: session.questionCount || 10,
+            difficulty: session.difficulty || 'medium',
+            pdfUri: session.pdfUri || null,
+            pdfName: session.pdfName || null,
+            pdfPageRange: session.pdfPageRange || null,
+          });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load active session:', e);
+    }
+    return false;
   },
 
   getResults: () => {

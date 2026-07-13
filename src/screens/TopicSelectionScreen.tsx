@@ -4,6 +4,7 @@ import {
   StyleSheet, Alert, Animated, ActivityIndicator,
   Platform, TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,10 +43,60 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation, route }) => 
   
   React.useEffect(() => {
     loadPdfContext();
+    checkActiveSession();
   }, []);
+
+  const checkActiveSession = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@kpss_active_quiz_session');
+      if (stored) {
+        const session = JSON.parse(stored);
+        if (session && session.questions && session.questions.length > 0) {
+          const answered = Object.keys(session.userAnswers || {}).length;
+          const total = session.questions.length;
+          const details = `${session.difficulty === 'easy' ? 'Kolay' : session.difficulty === 'medium' ? 'Orta' : session.difficulty === 'hard' ? 'Zor' : 'Uzman'} zorlukta, ${total} soruluk sınavın ${answered} sorusu çözülmüş.`;
+
+          if (Platform.OS === 'web') {
+            const confirmResume = window.confirm(`Yarım kalan bir sınavınız var.\n${details}\n\nDevam etmek ister misiniz?`);
+            if (confirmResume) {
+              const quizStore = useQuizStore.getState();
+              await quizStore.loadActiveSession();
+              navigation.navigate('Quiz');
+            } else {
+              await AsyncStorage.removeItem('@kpss_active_quiz_session');
+            }
+          } else {
+            Alert.alert(
+              'Yarım Kalan Sınav 📝',
+              `Yarım kalan bir sınavınız var.\n\n${details}\n\nDevam etmek ister misiniz?`,
+              [
+                { 
+                  text: 'Sil ve Yeni Başlat', 
+                  style: 'destructive',
+                  onPress: async () => {
+                    await AsyncStorage.removeItem('@kpss_active_quiz_session');
+                  }
+                },
+                { 
+                  text: 'Devam Et', 
+                  onPress: async () => {
+                    const quizStore = useQuizStore.getState();
+                    await quizStore.loadActiveSession();
+                    navigation.navigate('Quiz');
+                  }
+                }
+              ]
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Check active session failed:', e);
+    }
+  };
   
   const [isPicking, setIsPicking] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tarih' | 'cografya' | 'harita'>(route.params?.initialTab || 'tarih');
+  const [activeTab, setActiveTab] = useState<'tarih' | 'cografya' | 'vatandaslik' | 'guncel' | 'harita'>(route.params?.initialTab || 'tarih');
   const buttonScale = React.useRef(new Animated.Value(1)).current;
   const colors = useTheme();
 
@@ -170,6 +221,8 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation, route }) => 
 
   const tarihCount = topics.filter((t) => t.category === 'tarih' && selectedTopicsSet.has(t.id)).length;
   const cogCount = topics.filter((t) => t.category === 'cografya' && selectedTopicsSet.has(t.id)).length;
+  const vatCount = topics.filter((t) => t.category === 'vatandaslik' && selectedTopicsSet.has(t.id)).length;
+  const gunCount = topics.filter((t) => t.category === 'guncel' && selectedTopicsSet.has(t.id)).length;
   const allCategorySel = filteredTopics.length > 0 && filteredTopics.every((t) => selectedTopicsSet.has(t.id));
 
   const s = getStyles(colors);
@@ -184,42 +237,76 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation, route }) => 
       
       {/* Segmented Pill Tab Bar (Claude style) */}
       <View style={s.tabRow}>
-        <TouchableOpacity 
-          style={[s.tab, activeTab === 'tarih' && s.tabAct]} 
-          onPress={() => setActiveTab('tarih')} 
-          activeOpacity={0.8}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.tabScrollViewContent}
         >
-          <Text style={s.tabEmoji}>📜</Text>
-          <Text style={[s.tabText, activeTab === 'tarih' && s.tabTextAct]}>Tarih</Text>
-          {tarihCount > 0 && (
-            <View style={[s.badge, { backgroundColor: colors.primary }]}>
-              <Text style={s.badgeText}>{tarihCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[s.tab, activeTab === 'cografya' && s.tabAct]} 
-          onPress={() => setActiveTab('cografya')} 
-          activeOpacity={0.8}
-        >
-          <Text style={s.tabEmoji}>🌍</Text>
-          <Text style={[s.tabText, activeTab === 'cografya' && s.tabTextAct]}>Coğrafya</Text>
-          {cogCount > 0 && (
-            <View style={[s.badge, { backgroundColor: colors.primary }]}>
-              <Text style={s.badgeText}>{cogCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[s.tab, activeTab === 'tarih' && s.tabAct]} 
+            onPress={() => setActiveTab('tarih')} 
+            activeOpacity={0.8}
+          >
+            <Text style={s.tabEmoji}>📜</Text>
+            <Text style={[s.tabText, activeTab === 'tarih' && s.tabTextAct]}>Tarih</Text>
+            {tarihCount > 0 && (
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                <Text style={s.badgeText}>{tarihCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[s.tab, activeTab === 'cografya' && s.tabAct]} 
+            onPress={() => setActiveTab('cografya')} 
+            activeOpacity={0.8}
+          >
+            <Text style={s.tabEmoji}>🌍</Text>
+            <Text style={[s.tabText, activeTab === 'cografya' && s.tabTextAct]}>Coğrafya</Text>
+            {cogCount > 0 && (
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                <Text style={s.badgeText}>{cogCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[s.tab, activeTab === 'harita' && s.tabAct]} 
-          onPress={() => setActiveTab('harita')} 
-          activeOpacity={0.8}
-        >
-          <Text style={s.tabEmoji}>🗺️</Text>
-          <Text style={[s.tabText, activeTab === 'harita' && s.tabTextAct]}>Harita</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[s.tab, activeTab === 'vatandaslik' && s.tabAct]} 
+            onPress={() => setActiveTab('vatandaslik')} 
+            activeOpacity={0.8}
+          >
+            <Text style={s.tabEmoji}>⚖️</Text>
+            <Text style={[s.tabText, activeTab === 'vatandaslik' && s.tabTextAct]}>Vatandaşlık</Text>
+            {vatCount > 0 && (
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                <Text style={s.badgeText}>{vatCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[s.tab, activeTab === 'guncel' && s.tabAct]} 
+            onPress={() => setActiveTab('guncel')} 
+            activeOpacity={0.8}
+          >
+            <Text style={s.tabEmoji}>📰</Text>
+            <Text style={[s.tabText, activeTab === 'guncel' && s.tabTextAct]}>Güncel</Text>
+            {gunCount > 0 && (
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                <Text style={s.badgeText}>{gunCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[s.tab, activeTab === 'harita' && s.tabAct]} 
+            onPress={() => setActiveTab('harita')} 
+            activeOpacity={0.8}
+          >
+            <Text style={s.tabEmoji}>🗺️</Text>
+            <Text style={[s.tabText, activeTab === 'harita' && s.tabTextAct]}>Harita</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
       
       {activeTab === 'harita' ? (
@@ -253,7 +340,7 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation, route }) => 
             {/* Sources section */}
             <View style={s.qcSection}>
               <View style={s.pdfHeader}>
-                <Text style={s.qcLabel}>Kaynak PDF Dokümanları (En Fazla 3)</Text>
+                <Text style={s.qcLabel}>Kaynak PDF Dokümanları (En Fazla 4)</Text>
                 {pdfUri && (
                   <TouchableOpacity onPress={() => selectPdfSlot(null)}>
                     <Text style={s.clearPdf}>Seçimi Kaldır</Text>
@@ -262,7 +349,7 @@ export const TopicSelectionScreen: React.FC<Props> = ({ navigation, route }) => 
               </View>
 
               <View style={s.slotsRow}>
-                {['slot_1', 'slot_2', 'slot_3'].map((slotId, index) => {
+                {['slot_1', 'slot_2', 'slot_3', 'slot_4'].map((slotId, index) => {
                   const slot = pdfSlots[slotId];
                   const isSelected = selectedSlotId === slotId;
 
@@ -434,7 +521,6 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     lineHeight: 18,
   },
   tabRow: { 
-    flexDirection: 'row', 
     marginHorizontal: spacing.xxl, 
     marginBottom: spacing.md, 
     backgroundColor: colors.backgroundAlt, 
@@ -443,13 +529,18 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  tabScrollViewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xs,
+  },
   tab: { 
-    flex: 1, 
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'center', 
     borderRadius: borderRadius.sm, 
     paddingVertical: spacing.md - 3, 
+    paddingHorizontal: spacing.md,
     gap: spacing.xs 
   },
   tabAct: { 
@@ -630,9 +721,8 @@ const getStyles = (colors: AppTheme) => StyleSheet.create({
     flexWrap: 'wrap' 
   },
   slotWrapper: { 
-    width: '31%', 
-    minWidth: 100, 
-    maxWidth: 200, 
+    width: '23%', 
+    minWidth: 72, 
     position: 'relative' 
   },
   slotCard: { 

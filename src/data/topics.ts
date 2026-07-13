@@ -35,6 +35,24 @@ export const topics: Topic[] = [
   { id: 'cog_05', name: 'Türkiye\'de Tarım ve Hayvancılık (S. 110-122)', category: 'cografya' },
   { id: 'cog_06', name: 'Türkiye\'de Madencilik ve Enerji Kaynakları (S. 132-141)', category: 'cografya' },
   { id: 'cog_07', name: 'Türkiye\'de Sanayi, Ticaret, Ulaşım ve Turizm (S. 151-173)', category: 'cografya' },
+
+  // ======== VATANDAŞLIK KONULARI ========
+  { id: 'vat_01', name: 'Temel Hukuk Bilgileri ve Kavramları', category: 'vatandaslik' },
+  { id: 'vat_02', name: 'Borçlar Hukuku, Ticaret Hukuku ve Haklar', category: 'vatandaslik' },
+  { id: 'vat_03', name: 'Türk Anayasa Tarihi ve Anayasal Gelişmeler', category: 'vatandaslik' },
+  { id: 'vat_04', name: 'Temel Hak ve Ödevler (Kişi, Sosyal, Siyasi Haklar)', category: 'vatandaslik' },
+  { id: 'vat_05', name: '1982 Anayasası: Yasama ve Seçim Sistemi', category: 'vatandaslik' },
+  { id: 'vat_06', name: '1982 Anayasası: Yürütme Organı (Cumhurbaşkanı ve CBK)', category: 'vatandaslik' },
+  { id: 'vat_07', name: '1982 Anayasası: Yargı Organı (Yüksek Mahkemeler)', category: 'vatandaslik' },
+  { id: 'vat_08', name: 'İdare Hukuku, Türkiye\'nin İdari Yapısı ve Devlet Memurları (657)', category: 'vatandaslik' },
+
+  // ======== GÜNCEL BİLGİLER KONULARI ========
+  { id: 'gun_01', name: 'Uluslararası Kuruluşlar, Zirveler ve Başkanlıklar', category: 'guncel' },
+  { id: 'gun_02', name: 'Türkiye Gündemi, Teknoloji, Uzay ve Savunma Sanayii', category: 'guncel' },
+  { id: 'gun_03', name: 'Türkiye\'nin En\'leri, Coğrafi Veriler ve İlkler', category: 'guncel' },
+  { id: 'gun_04', name: 'Kültür, Sanat, Edebiyat, Arkeoloji ve Nobel Ödülleri', category: 'guncel' },
+  { id: 'gun_05', name: 'Spor Dünyası ve Şampiyonalar (2025/2026)', category: 'guncel' },
+  { id: 'gun_06', name: 'Anayasa, Yüksek Yargı, Yönetim ve Güncel Görevliler', category: 'guncel' },
 ];
 
 export const questionCountOptions = [5, 10, 15, 20];

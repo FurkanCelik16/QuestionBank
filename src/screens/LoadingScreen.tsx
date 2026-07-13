@@ -57,7 +57,7 @@ const ALL_TOPIC_PAGES: Record<string, string> = {
 };
 
 export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { selectedTopics, questionCount, difficulty } = route.params;
+  const { selectedTopics, questionCount, difficulty, focusSubtopics } = route.params;
   const { apiKey } = useSettingsStore();
   const { setQuestions, setError } = useQuizStore();
   
@@ -147,7 +147,14 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
     ])).slice(0, 60);
 
     let finalPageRange = pdfPageRange;
-    if (!finalPageRange && selectedTopics.length > 0) {
+    // Check if the uploaded PDF is the original one
+    const isOriginalPdf = !pdfName || (
+      pdfName.toLowerCase().includes('tarihnot2') ||
+      pdfName.toLowerCase().includes('cografya') ||
+      pdfName.toLowerCase().includes('cog_')
+    );
+
+    if (!finalPageRange && selectedTopics.length > 0 && isOriginalPdf) {
       const ranges: string[] = [];
       selectedTopics.forEach((topicName) => {
         const foundTopic = topics.find((t) => t.name === topicName);
@@ -159,7 +166,11 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
       if (ranges.length > 0) {
         finalPageRange = Array.from(new Set(ranges)).join(', ');
       }
+    } else if (!isOriginalPdf) {
+      // If it is a custom/premium PDF, we bypass the hardcoded page ranges entirely
+      finalPageRange = null;
     }
+
 
     let finalBase64 = pdfBase64;
     if (!finalBase64 && pdfUri && Platform.OS !== 'web') {
@@ -184,7 +195,8 @@ export const LoadingScreen: React.FC<Props> = ({ navigation, route }) => {
         geminiFileUri,
         finalPageRange,
         pdfName,
-        combinedQuestionTexts
+        combinedQuestionTexts,
+        focusSubtopics
       );
 
       if (quiz.questions) {
