@@ -1,15 +1,21 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Dependencies & Node module backups
 node_modules/
+node_modules_old/
+node_modules_*/
+node_modules.*/
 
-# Expo
+# Expo & Build outputs
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native generated directories
+/ios
+/android
 .kotlin/
 *.orig.*
 *.jks
@@ -17,25 +23,58 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.apk
+*.aab
+*.ipa
 
-# Metro
+# Metro & Bundler
 .metro-health-check*
+*.metro-health-check
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Temporary, debug & test scripts in root
+test_*.js
+validate_*.js
+detailed_test.js
+print_json_error.js
+temp_*
+tmp_*
 
-# macOS
+# Logs & Debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.log
+
+# Testing & Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Local Environment Variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# IDE & System Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.pem
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# local env files
-.env*.local
-
-# typescript
+# TypeScript cache
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
