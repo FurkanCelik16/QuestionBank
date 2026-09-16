@@ -17,6 +17,7 @@ import { MapQuizResultScreen } from '../screens/MapQuizResultScreen';
 import { MistakeResolverScreen } from '../screens/MistakeResolverScreen';
 import { SmartIndexScreen } from '../screens/SmartIndexScreen';
 import { TimelineGameScreen } from '../screens/TimelineGameScreen';
+import { RecentQuestionsScreen } from '../screens/RecentQuestionsScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -75,6 +76,13 @@ export const AppNavigator: React.FC = () => {
                       activeOpacity={0.7}
                     >
                       <Text style={navStyles.headerIcon}>📊</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('RecentQuestions')}
+                      style={navStyles.headerBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={navStyles.headerIcon}>📋</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => navigation.navigate('Settings')}
@@ -170,6 +178,13 @@ export const AppNavigator: React.FC = () => {
               component={TimelineGameScreen}
               options={{
                 headerTitle: 'Zaman Tüneli ⏳',
+              }}
+            />
+            <Stack.Screen
+              name="RecentQuestions"
+              component={RecentQuestionsScreen}
+              options={{
+                headerTitle: 'Son 300 Soru 📋',
               }}
             />
           </>

@@ -588,10 +588,16 @@ export async function generateQuiz(
 10. Öncüllü Sorularda Standart Biçim: Öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise sadece klasik kombinasyonlardan ("Yalnız I", "I ve II" vb.) oluşmalıdır. Seçeneklerde öncüllerin metinlerini tekrarlamaktan kaçın. Soru metninde öncülleri listelemeyi unutmadan açıkça belirt.
 11. Çeldirici ve Seçenek Yazım Kuralları (Yüksek Seçicilik):
     - Seçenek Tutarlılığı: Tüm yanlış seçenekleri (çeldiricileri) sorunun ait olduğu konuyla uyumlu, gerçek KPSS terimleri arasından seç. Uydurma, saçma veya konunun tamamen dışındaki alakasız kavramları seçeneklere koymaktan kaçın.
+    - Kendi Bilgi Birikimini Kullan: Çeldiricileri oluştururken sadece verilen müfredat metnine veya dokümana değil, kendi genel bilgi birikimine de güven. Dokümanda yer alan bilgilerle sınırlı kalma. Eğer bir bilgi birden fazla şıkta doğru olabilecek kadar genel ise, doğru cevabı daha spesifik hale getir veya çeldiricileri doküman dışındaki gerçek ama yanlış terimlerden oluştur.
     - Uzunluk ve Gramer Dengesi: Doğru şık, diğer şıklardan benzer uzunlukta ve benzer ifade tarzına sahip olmalıdır ki doğru cevap sırıtmasın.
     - Güçlü Çeldirme Gücü: Şıklardan en az iki tanesini doğru cevaba kavramsal veya kronolojik olarak çok yakın, öğrencilerin en sık karıştırdığı gerçek terimler arasından seçerek çeldirme gücünü yüksek tut.
     - Tek Doğru Cevap Güvencesi: Seçeneklerden sadece ve sadece bir tanesinin kesinlikle doğru cevap olmasını sağla. Diğer 4 seçenek (çeldiriciler), doğru seçeneğe bilgi ve mantık olarak ne kadar yakın görünürse görünsün, soru kökünde sorulan durum açısından kesin olarak yanlış olmalıdır. Çelişkili veya yoruma göre değişebilen muğlak sorular yerine, doğru cevabı bilimsel olarak tartışmasız tek olan sorular tasarla.
-12. Geçmiş Soruları Filtreleme: Aşağıda "Daha önce sorulan kavramlar" ve "Son çözülen sorular" başlıkları altında listelenen konu başlıklarının ve soruların dışındaki yeni, farklı ve özgün bilgilere odaklan. Bu listeleri bir tasarım dışı listesi olarak gör ve buradaki kavramları elenmiş say.
+12. CEVAP SIZDIRMA VE SPOILER YASAĞI (EN KRİTİK KURAL):
+    - Soru metninin ("question_text") veya alıntının hiçbir yerinde, soru kökünün sorduğu doğru cevabın ADINI VEYA İSMİNİ KESİNLİKLE GEÇİRME!
+    - ÖRNEK HATA: "Osmanlı Devleti'nde mimari bir yapı tekniği olan Türk Üçgeni hangi devlette gelişmiştir? -> Cevap: Osmanlı". Buradaki "Osmanlı Devleti'nde" kelimesi cevabı sızdırmaktadır! Bunun yerine "Türk-İslam mimarisinde bir yapı tekniği olan Türk Üçgeni hangi devlette gelişmiştir?" şeklinde soruyu genel kurgula.
+    - ÖRNEK HATA: "Gök Tanrı tarafından hükümdara yönetme yetkisi verilmesini ifade eden Kut anlayışı aşağıdakilerden hangisidir? -> Cevap: Kut". Soru kökünde sorulan kavramın adı soru metninde asla geçmemelidir!
+    - "subtopic" alanına yazdığın terimi soru metninde doğrudan cevap kelimesi olarak kullanma.
+13. Geçmiş Soruları Filtreleme: Aşağıda "Daha önce sorulan kavramlar" ve "Son çözülen sorular" başlıkları altında listelenen konu başlıklarının ve soruların dışındaki yeni, farklı ve özgün bilgilere odaklan. Bu listeleri bir tasarım dışı listesi olarak gör ve buradaki kavramları elenmiş say.
 `;
 
   const pdfVarietyAndCoverageMandate = `
@@ -618,10 +624,16 @@ ${isNarrowRange
 12. ÖNCÜLLÜ (I, II, III NUMARALI) SORULARDA MUTLAK KURAL: Eğer öncüllü (yani I., II., III. gibi Roma rakamlı önermeler içeren) bir soru kurguluyorsan; öncüllerin tüm metnini soru metninin (question_text) en başında yaz. Seçenekler (A, B, C, D, E) ise sadece klasik kombinasyonlardan ("Yalnız I", "I ve II" vb.) oluşmalıdır. Seçeneklerde öncüllerin metinlerini tekrarlamaktan kaçın. Soru metninde öncülleri listelemeyi unutmadan açıkça belirt.
 13. ÇELDİRİCİ VE SEÇENEK YAZIM KURALLARI (YÜKSEK SEÇİCİLİK):
     - Seçenek Tutarlılığı: Tüm yanlış seçenekleri (çeldiricileri) sorunun ait olduğu konuyla uyumlu, gerçek KPSS terimleri arasından seç. Uydurma, saçma veya konunun tamamen dışındaki alakasız kavramları seçeneklere koymaktan kaçın.
+    - Kendi Bilgi Birikimini Kullan: Çeldiricileri oluştururken sadece verilen müfredat metnine veya dokümana değil, kendi genel bilgi birikimine de güven. Dokümanda yer alan bilgilerle sınırlı kalma. Eğer bir bilgi birden fazla şıkta doğru olabilecek kadar genel ise, doğru cevabı daha spesifik hale getir veya çeldiricileri doküman dışındaki gerçek ama yanlış terimlerden oluştur.
     - Uzunluk ve Gramer Dengesi: Doğru şık, diğer şıklardan benzer uzunlukta ve benzer ifade tarzına sahip olmalıdır ki doğru cevap sırıtmasın.
     - Güçlü Çeldirme Gücü: Şıklardan en az iki tanesini doğru cevaba kavramsal veya kronolojik olarak çok yakın, öğrencilerin en sık karıştırdığı gerçek terimler arasından seçerek çeldirme gücünü yüksek tut.
-    - Tek Doğru Cevap Güvencesi: Seçeneklerden sadece ve sadece bir tanesinin kesinlikle doğru cevap olmasını sağla. Diğer 4 seçenek (çeldiriciler), doğru seçeneğe bilgi ve mantık olarak ne kadar yakın görünürse görünsün, soru kökünde sorulan durum açısından kesin olarak yanlış olmalıdır. Çelişkili veya yoruma göre değişebilen muğlak sorular yerine, doğru cevabı bilimsel olarak tartışmasız tek olan sorular tasarla.
-14. Geçmiş Soruları Filtreleme: Aşağıda "Daha önce sorulan kavramlar" ve "Son çözülen sorular" başlıkları altında listelenen konu başlıklarının ve soruların dışındaki yeni, farklı ve özgün bilgilere odaklan. Bu listeleri bir tasarım dışı listesi olarak gör ve buradaki kavramları elenmiş say.
+    - Tek Doğru Cevap Güvencesi: Seçeneklerden sadece ve sonra bir tanesinin kesinlikle doğru cevap olmasını sağla. Diğer 4 seçenek (çeldiriciler), doğru seçeneğe bilgi ve mantık olarak ne kadar yakın görünürse görünsün, soru kökünde sorulan durum açısından kesin olarak yanlış olmalıdır. Çelişkili veya yoruma göre değişebilen muğlak sorular yerine, doğru cevabı bilimsel olarak tartışmasız tek olan sorular tasarla.
+14. CEVAP SIZDIRMA VE SPOILER YASAĞI (EN KRİTİK KURAL):
+    - Soru metninin ("question_text") veya alıntının hiçbir yerinde, soru kökünün sorduğu doğru cevabın ADINI VEYA İSMİNİ KESİNLİKLE GEÇİRME!
+    - ÖRNEK HATA: "Osmanlı Devleti'nde mimari bir yapı tekniği olan Türk Üçgeni hangi devlette gelişmiştir? -> Cevap: Osmanlı". Buradaki "Osmanlı Devleti'nde" kelimesi cevabı sızdırmaktadır! Bunun yerine "Türk-İslam mimarisinde bir yapı tekniği olan Türk Üçgeni hangi devlette gelişmiştir?" şeklinde soruyu genel kurgula.
+    - ÖRNEK HATA: "Gök Tanrı tarafından hükümdara yönetme yetkisi verilmesini ifade eden Kut anlayışı aşağıdakilerden hangisidir? -> Cevap: Kut". Soru kökünde sorulan kavramın adı soru metninde asla geçmemelidir!
+    - "subtopic" alanına yazdığın terimi soru metninde doğrudan cevap kelimesi olarak kullanma.
+15. Geçmiş Soruları Filtreleme: Aşağıda "Daha önce sorulan kavramlar" ve "Son çözülen sorular" başlıkları altında listelenen konu başlıklarının ve soruların dışındaki yeni, farklı ve özgün bilgilere odaklan. Bu listeleri bir tasarım dışı listesi olarak gör ve buradaki kavramları elenmiş say.
 `;
 
   const explanationLength: Record<DifficultyLevel, string> = {
@@ -634,17 +646,17 @@ ${isNarrowRange
   const speedConstraints = `
 KURALLAR:
 1. SUBTOPIC ALANI: "subtopic" alanını çok spesifik, mikro düzeyde bir kavramla doldur. Genel kategori veya ders başlıkları yerine, doğrudan o sorunun ölçtüğü spesifik olay, kurum, yer şekli veya kanun maddesinin adını yaz.
-2. SORU ÇEŞİTLİLİĞİ: Soruların en az %30'unun analiz ve yorum gücünü ölçmesini sağla:
-   - Doğrudan soru formatı (en fazla %40 oranında tut)
+2. BİLGİ ODAKLI SORU ZORUNLULUĞU: Soruların tamamı bilgi odaklı olsun. Her soru net bir şekilde isim, savaş, tarih, rakam, yer, kurum, antlaşma, kanun maddesi veya somut bilgi sorsun. Yorum, analiz, sebep-sonuç çıkarımı, "hangisi söylenebilir?" veya "aşağıdakilerden hangisi çıkarılabilir?" tarzı subjektif ve yoruma açık sorulardan kesinlikle kaçın. Soru formatları:
+   - Doğrudan bilgi sorusu formatı (ağırlıklı olarak kullan)
    - Yanlış olanı bulma formatı (en az 2 soru ekle)
-   - Öncüllü sorular (en az 2 soru): Öncüllü sorularda en az 3 öncül (I., II., III.) kullan. Öncülleri soru metninin başında yaz, şıklara klasik kombinasyonlar ("Yalnız I", "I ve II" vb.) koy.
-   - Sebep-sonuç, karşılaştırma veya yorum sorusu (en az 2 soru ekle)
+   - Öncüllü sorular (en az 2 soru): Öncüllü sorularda en az 3 öncül (I., II., III.) kullan. Öncülleri soru metninin başında yaz, şıklara klasik kombinasyonlar ("Yalnız I", "I ve II" vb.) koy. Öncüller de bilgi ifadeleri olsun, yorum ifadeleri değil.
 3. ŞIK DENGESİ: Doğru cevapları A, B, C, D, E harfleri arasında dengeli dağıt (her harf en az 1, en fazla 3 kez doğru olsun). Tüm şıkların uzunluklarını birbirine benzer tut.
 4. SORU KARIŞTIRMA: Soruların konularını ve sıralamasını tamamen karıştır. Benzer konulardan olan soruları arka arkaya dizmek yerine aralara dağıt.
 5. TEK DOĞRU CEVAP: Her sorunun net ve tek bir doğru cevabı olmasını sağla. Açıklamada neden diğer şıkların yanlış olduğunu belirt.
-6. ÇELDİRİCİLER: Yanlış şıkları sorulan konuyla aynı alana ait gerçek ve bilimsel terimlerden seç.
+6. ÇELDİRİCİLER VE KENDİ BİLGİ BİRİKİMİ: Yanlış şıkları (çeldiricileri) oluştururken sadece verilen dokümana veya müfredat metnine değil, kendi genel bilgi birikimine de güven. Dokümanda yer alan bilgilerle sınırlı kalma. Eğer dokümandaki bir bilgi birden fazla şıkta doğru olabilecek kadar genel ise, doğru cevabı daha spesifik hale getir veya çeldiricileri doküman dışındaki gerçek ama yanlış terimlerden oluştur. Bu sayede her seçeneğin kesinlikle farklı ve tek doğru cevabın tartışmasız olmasını sağla.
 7. GİRİŞ ÇEŞİTLİLİĞİ: Her sorunun giriş cümlesi farklı olsun. Aynı kalıbı tekrar kullanmaktan kaçın.
-8. ${explanationLength[difficulty]}
+8. CEVAP SIZDIRMA YASAĞI: Soru metninde ("question_text"), sorduğun doğru cevabın kendisini kesinlikle geçirme! Soru kökünde sorulan ana terimi/devleti/kavramı soru cümlesinin içinden gizle ve seçeneklere koy.
+9. ${explanationLength[difficulty]}
 `;
 
   const extremeMandate = (difficulty === 'extreme')
@@ -1484,9 +1496,59 @@ export function cleanReferencingPhrases(text: string): string {
   return cleaned;
 }
 
+export function cleanAnswerLeakage(qText: string, correctText: string): string {
+  if (!correctText || correctText.trim().length < 3 || !qText) return qText;
+
+  const target = correctText.trim();
+  const lowerText = qText.toLowerCase();
+  const lowerTarget = target.toLowerCase();
+
+  // If the correct answer text is contained inside the question prompt text
+  if (lowerText.includes(lowerTarget)) {
+    const questionKeywords = [
+      'hangisidir', 'hangi devlette', 'hangi padişah', 'hangi hükümdar', 'hangi savaş',
+      'hangi antlaşma', 'hangi il', 'hangi şehir', 'hangi kavram', 'hangi dönemde',
+      'hangi kurum', 'hangi yılda', 'hangi kanun', 'hangi olay', 'hangisinde'
+    ];
+
+    const hasQuestionKeyword = questionKeywords.some(kw => lowerText.includes(kw));
+
+    if (hasQuestionKeyword) {
+      const escapedTarget = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let cleaned = qText;
+
+      // Replace target Devleti'nde / Devletinde -> İlgili dönemde
+      cleaned = cleaned.replace(new RegExp(`${escapedTarget}\\s+Devlet(?:i'nde|inde|i|i'nin|inin)`, 'gi'), 'İlgili dönemde');
+      // Replace target İmparatorluğu'nda -> İlgili dönemde
+      cleaned = cleaned.replace(new RegExp(`${escapedTarget}\\s+İmparatorluğu(?:'nda|nda)`, 'gi'), 'İlgili dönemde');
+      // Replace quotes like 'Target' or 'Target anlayışı'
+      cleaned = cleaned.replace(new RegExp(`['"“‘]${escapedTarget}(?:\\s+anlayışı|\\s+kavramı)?['"”’]`, 'gi'), 'söz konusu kavram');
+
+      // Standalone word replace if still found
+      if (cleaned.toLowerCase().includes(lowerTarget)) {
+        cleaned = cleaned.replace(new RegExp(`\\b${escapedTarget}\\b`, 'gi'), 'söz konusu unsur');
+      }
+
+      if (cleaned.length > 0) {
+        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+      return cleaned;
+    }
+  }
+
+  return qText;
+}
+
 export function cleanQuestionPlakas(q: QuizQuestion): QuizQuestion {
   let qText = cleanPlakaFromText(q.question_text);
   qText = cleanReferencingPhrases(qText);
+
+  // Clean answer leakage if correct answer option text is leaked in question_text
+  const correctOptionText = q.options && q.correct_answer && q.options[q.correct_answer as keyof typeof q.options];
+  if (correctOptionText) {
+    qText = cleanAnswerLeakage(qText, correctOptionText);
+  }
+
   return {
     ...q,
     question_text: qText,

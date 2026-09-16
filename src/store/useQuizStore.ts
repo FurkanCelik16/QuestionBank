@@ -494,6 +494,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     let correctCount = 0;
     let wrongCount = 0;
     let emptyCount = 0;
+    const correctAnswers: QuizResult['correctAnswers'] = [];
     const wrongAnswers: QuizResult['wrongAnswers'] = [];
     const emptyAnswers: QuizResult['emptyAnswers'] = [];
 
@@ -505,6 +506,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         emptyAnswers.push({ question });
       } else if (userAnswer === question.correct_answer) {
         correctCount++;
+        correctAnswers.push({ question, userAnswer });
       } else {
         wrongCount++;
         wrongAnswers.push({
@@ -524,6 +526,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       wrongCount,
       emptyCount,
       scorePercentage,
+      correctAnswers,
       wrongAnswers,
       emptyAnswers,
     };

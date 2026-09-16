@@ -39,6 +39,7 @@ export interface QuizResult {
   wrongCount: number;
   emptyCount: number;
   scorePercentage: number;
+  correctAnswers: CorrectAnswer[];
   wrongAnswers: WrongAnswer[];
   emptyAnswers: EmptyAnswer[];
 }
@@ -50,6 +51,11 @@ export interface WrongAnswer {
 
 export interface EmptyAnswer {
   question: QuizQuestion;
+}
+
+export interface CorrectAnswer {
+  question: QuizQuestion;
+  userAnswer: string;
 }
 
 export interface TestHistoryItem {
@@ -89,4 +95,5 @@ export type RootStackParamList = {
   MistakeResolver: undefined;
   SmartIndex: undefined;
   TimelineGame: undefined;
+  RecentQuestions: undefined;
 };

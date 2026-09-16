@@ -155,7 +155,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
             <View style={s.qTypeRow}>
               <View style={s.qTypeBadge}>
                 <Text style={s.qType} numberOfLines={1} ellipsizeMode="tail">
-                  {question.subtopic || 'GENEL BİLGİ'}{question.page_number ? ` · S. ${question.page_number}` : ''}
+                  {question.page_number ? `Doküman Sayfa ${question.page_number}` : `KPSS Testi · Soru ${currentIndex + 1} / ${totalQuestions}`}
                 </Text>
               </View>
               {difficulty && (

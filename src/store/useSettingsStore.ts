@@ -163,10 +163,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // Automatically sanitize legacy history on boot to repair any broad/corrupt topics
       const cleanedAsked = cleanSubtopics(Array.isArray(parsedAsked) ? parsedAsked : []);
 
+      // Fallback for removed models - if stored model is no longer available, reset to default
+      const validModels = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+      const resolvedModel = (model && validModels.includes(model)) ? model : 'gemini-3.1-flash-lite';
+
       set({
         apiKey: key || 'AIzaSyBTyCo8aoRY7yq5ENnCUZh7_9FWWuicAU0',
         themeMode: (theme as ThemeMode) || 'dark',
-        geminiModel: model || 'gemini-3.1-flash-lite',
+        geminiModel: resolvedModel,
         askedQuestions: cleanedAsked,
         seenQuestionTexts: Array.isArray(parsedSeen) ? parsedSeen : [],
         isLoaded: true

@@ -7,6 +7,7 @@ import { useTheme, borderRadius, spacing, fontSize, shadow, AppTheme } from '../
 import { useQuizStore } from '../store/useQuizStore';
 import { ResultSummaryCard } from '../components/ResultSummaryCard';
 import { WrongAnswerCard } from '../components/WrongAnswerCard';
+import { CorrectAnswerCard } from '../components/CorrectAnswerCard';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
@@ -90,6 +91,7 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const hasWrongOrEmpty = result.wrongAnswers.length > 0 || result.emptyAnswers.length > 0;
+  const hasCorrect = result.correctAnswers && result.correctAnswers.length > 0;
   const isHighPerformance = result.scorePercentage >= 80;
   const s = getStyles(colors);
 
@@ -159,6 +161,27 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={s.perfectSub}>
               Tebrikler! Sınavdaki tüm soruları hatasız yanıtlayarak kusursuz bir başarı elde ettin.
             </Text>
+          </View>
+        )}
+
+        {/* Correct Answers Section */}
+        {hasCorrect && (
+          <View style={s.analysisSection}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>✓ Doğru Cevapladığın Sorular</Text>
+              <Text style={s.sectionSub}>
+                Doğru yanıtladığın soruları ve açıklamalarını incelemek için kartlara dokunun.
+              </Text>
+            </View>
+
+            {result.correctAnswers.map((item, index) => (
+              <CorrectAnswerCard
+                key={`correct-${item.question.id}`}
+                question={item.question}
+                userAnswer={item.userAnswer}
+                index={index}
+              />
+            ))}
           </View>
         )}
       </ScrollView>

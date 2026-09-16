@@ -16,10 +16,8 @@ import { useTheme, spacing, borderRadius, fontSize, shadow, AppTheme } from '../
 import { useSettingsStore, ThemeMode } from '../store/useSettingsStore';
 
 const modelOptions = [
+  { key: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', emoji: '✨', description: 'En yeni Lite model. Yüksek kaliteli soru üretimi ve hızlı yanıt süresi.' },
   { key: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', emoji: '💡', description: 'Yüksek limit oranına sahip (Günde 500 istek!), son derece hızlı ve güncel model.' },
-  { key: 'gemini-3-flash', label: 'Gemini 3 Flash', emoji: '⚡', description: 'Üst düzey performans sunan yeni nesil hızlı model.' },
-  { key: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', emoji: '🎯', description: 'Son derece dengeli, hızlı ve kaliteli soru üretimi.' },
-  { key: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite', emoji: '🌟', description: 'Günde 1500 istek limitine sahip, ultra hızlı ve hatasız çalışan stabil Lite model.' },
 ];
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
